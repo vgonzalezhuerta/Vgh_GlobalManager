@@ -1,0 +1,8 @@
+# Los datos nunca viven en el repositorio: están en Google Drive.
+global.json
+*.jpg
+*.jpeg
+*.png
+!icons/*.png
+.DS_Store
+Thumbs.db
