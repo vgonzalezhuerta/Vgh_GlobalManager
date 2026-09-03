@@ -14,7 +14,8 @@ function etiquetasFecha (t) {
   }
   if (t.repeat) out.push(`<span class="etq per">${esc(fmtPeriodo(t.repeat))}</span>`)
   if (t.priority === 2) out.push('<span class="etq pri2">urgente</span>')
-  if (t.calendarEventId) out.push('<span class="etq">📅</span>')
+  if (recordatorioViejo(t)) out.push('<span class="etq tarde">📅 desfasado</span>')
+  else if (recordatorioPuesto(t)) out.push('<span class="etq">📅</span>')
   if ((t.photos || []).length) out.push(`<span class="etq">📷 ${t.photos.length}</span>`)
   return out.join('')
 }
@@ -73,12 +74,11 @@ function conecta (cont) {
   })
 }
 
-// Un cambio en una tarea toca tres cosas: Drive, Calendar y el resumen que lee el
-// service worker para avisar. Ninguna debe tumbar el guardado, que ya está hecho.
-function trasCambio (t) {
+// Un cambio en una tarea toca dos cosas más: la carpeta y el resumen que lee el service
+// worker para avisar. Ninguna debe tumbar el guardado, que ya está hecho en el dispositivo.
+function trasCambio () {
   guardaResumenParaSW()
-  if (t) sincronizaEventoSuave(t)
-  if (clientId()) sincroniza(false)
+  sincroniza(false)
 }
 
 function pinta (html) {

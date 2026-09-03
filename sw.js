@@ -4,7 +4,7 @@
 // cacheada y el cambio no llega al móvil. Es el error más fácil de cometer aquí, y el
 // único sitio donde se escribe la versión: la insignia de Ajustes se la pregunta al
 // service worker con postMessage('version').
-const VERSION = 'globalmanager-v1'
+const VERSION = 'globalmanager-v2'
 
 const SHELL = [
   './',
@@ -14,8 +14,7 @@ const SHELL = [
   'js/config.js',
   'js/util.js',
   'js/store.js',
-  'js/google.js',
-  'js/drive.js',
+  'js/carpeta.js',
   'js/calendar.js',
   'js/photos.js',
   'js/notify.js',
@@ -48,8 +47,8 @@ self.addEventListener('activate', e => {
   })())
 })
 
-// Solo se cachea el armazón propio. Las llamadas a Google van siempre a la red: cachear
-// una respuesta de Drive o Calendar sería servir datos viejos como si fueran buenos.
+// Solo se cachea el armazón propio. Los datos no pasan por aquí: viven en la carpeta que
+// el usuario eligió y se leen con la File System Access API, que el service worker no ve.
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url)
   if (e.request.method !== 'GET') return

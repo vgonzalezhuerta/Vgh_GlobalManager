@@ -80,7 +80,7 @@ function pintaCompras (a) {
   if (v) v.onclick = () => {
     if (!confirm(`¿Quitar ${hechas.length} artículo(s) ya comprados?`)) return
     for (const t of hechas) borra('tasks', t.id)
-    trasCambio(null)
+    trasCambio()
     status('Lista limpia.')
     dibuja()
   }
@@ -111,7 +111,7 @@ registra('personas', () => {
     if (!name) { status('Escribe un nombre.', true); return }
     if (gente.some(p => p.name.toLowerCase() === name.toLowerCase())) { status('Ya está en la lista.', true); return }
     upsert('people', { id: uid(), name })
-    trasCambio(null)
+    trasCambio()
     dibuja()
   }
   $('#p-add').onclick = add
@@ -121,7 +121,7 @@ registra('personas', () => {
       const p = busca('people', b.dataset.borrar)
       if (!confirm(`¿Borrar a ${p.name}? Sus ideas de regalo se quedan sin destinatario.`)) return
       borra('people', p.id)
-      trasCambio(null)
+      trasCambio()
       dibuja()
     }
   })

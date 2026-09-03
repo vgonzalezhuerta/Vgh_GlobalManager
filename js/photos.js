@@ -1,11 +1,11 @@
 'use strict'
 
-// Las fotos se reducen antes de subirlas: una foto de móvil son 4 MB y en la ficha se
-// ve a 400 px. Se guarda una versión de 1600 px en Drive y una miniatura en IndexedDB.
+// Las fotos se reducen antes de guardarlas: una foto de móvil son 4 MB y en la ficha se
+// ve a 400 px. En la carpeta queda una versión de 1600 px y en IndexedDB la miniatura.
 const MAX_LADO = 1600
 const MAX_MINI = 400
 
-const urls = new Map()   // fileId|local -> objectURL de la miniatura
+const urls = new Map()   // nombre de archivo -> objectURL de la miniatura
 
 function pideFoto () {
   return new Promise(ok => {
@@ -40,39 +40,35 @@ async function reduce (blob, lado, calidad) {
   return { blob: out || blob, w, h }
 }
 
-// Devuelve el descriptor que se guarda en la tarea. Mientras no haya id de Drive
-// viaja con `local`, y `subePendientes()` lo cambia cuando la sube.
+// La foto se apunta en «subidas» con el nombre que tendrá en la carpeta. Si la carpeta
+// está a mano se vuelca ya; si no, espera ahí a la próxima sincronización.
 async function anadeFoto (blob) {
-  const clave = `foto_${uid()}.jpg`
+  const name = `foto_${uid()}.jpg`
   const grande = await reduce(blob, MAX_LADO, 0.82)
   const mini = await reduce(grande.blob, MAX_MINI, 0.72)
-  await guardaFotoPendiente(clave, grande.blob)
-  await idbSet('thumbs', clave, mini.blob)
-  return { local: clave, name: clave, w: grande.w, h: grande.h }
+  await idbSet('subidas', name, grande.blob)
+  await idbSet('thumbs', name, mini.blob)
+  if (hayCarpeta()) volcaFotosPendientes().catch(() => {})
+  return { name, w: grande.w, h: grande.h }
 }
 
-const claveFoto = f => f.fileId || f.local
-
 async function miniatura (f) {
-  const k = claveFoto(f)
-  if (urls.has(k)) return urls.get(k)
-  let blob = await idbGet('thumbs', k)
-  if (!blob && f.fileId) {
-    // No está cacheada: se baja el original y se guarda la miniatura para la próxima vez.
-    try {
-      const orig = await reintenta(() => bajaFoto(f.fileId), 2)
-      blob = (await reduce(orig, MAX_MINI, 0.72)).blob
-      await idbSet('thumbs', k, blob)
-    } catch (e) { return null }
+  if (urls.has(f.name)) return urls.get(f.name)
+  let blob = await idbGet('thumbs', f.name)
+  if (!blob) {
+    // No está cacheada: se lee de la carpeta y se guarda la miniatura para la próxima vez.
+    const orig = await leeFoto(f.name)
+    if (!orig) return null
+    blob = (await reduce(orig, MAX_MINI, 0.72)).blob
+    await idbSet('thumbs', f.name, blob)
   }
-  if (!blob) return null
   const url = URL.createObjectURL(blob)
-  urls.set(k, url)
+  urls.set(f.name, url)
   return url
 }
 
-// Pinta las miniaturas cuando su contenedor se acerca a la pantalla: en una lista larga
-// bajar todas las fotos de golpe son cientos de lecturas antes de ver nada.
+// Se pide cada miniatura cuando su hueco se acerca a la pantalla: en una lista larga,
+// leer todas las fotos de la carpeta de golpe deja la app en blanco un buen rato.
 const observador = 'IntersectionObserver' in window
   ? new IntersectionObserver(es => {
     for (const e of es) {
@@ -93,20 +89,26 @@ function observaFoto (el, f) {
 async function abreLightbox (fotos, i = 0) {
   const cap = $('#lightbox')
   let idx = i
+  let actual = null
   const pinta = async () => {
     const f = fotos[idx]
-    cap.querySelector('.lb-img').style.backgroundImage = ''
+    const img = cap.querySelector('.lb-img')
+    img.style.backgroundImage = ''
     cap.querySelector('.lb-n').textContent = `${idx + 1} / ${fotos.length}`
-    // El original no se cachea: son megas por foto y el visor se abre de una en una.
-    let blob = f.local ? await idbGet('subidas', f.local) : null
-    if (!blob && f.fileId) { try { blob = await reintenta(() => bajaFoto(f.fileId), 2) } catch (e) {} }
-    if (!blob) blob = await idbGet('thumbs', claveFoto(f))
-    if (blob) cap.querySelector('.lb-img').style.backgroundImage = `url(${URL.createObjectURL(blob)})`
-    else status('No se pudo abrir la foto. ¿Hay conexión?', true)
+    // El original no se cachea: son megas por foto y se mira de una en una.
+    const blob = await leeFoto(f.name) || await idbGet('thumbs', f.name)
+    if (!blob) { status('No se encuentra la foto en la carpeta.', true); return }
+    if (actual) URL.revokeObjectURL(actual)
+    actual = URL.createObjectURL(blob)
+    img.style.backgroundImage = `url(${actual})`
+  }
+  const cierra = () => {
+    cap.hidden = true
+    if (actual) { URL.revokeObjectURL(actual); actual = null }
   }
   cap.hidden = false
   cap.querySelector('.lb-prev').onclick = () => { idx = (idx - 1 + fotos.length) % fotos.length; pinta() }
   cap.querySelector('.lb-next').onclick = () => { idx = (idx + 1) % fotos.length; pinta() }
-  cap.querySelector('.lb-cerrar').onclick = () => { cap.hidden = true }
+  cap.querySelector('.lb-cerrar').onclick = cierra
   pinta()
 }

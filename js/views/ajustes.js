@@ -2,25 +2,24 @@
 
 registra('ajustes', () => {
   cabecera('Ajustes')
-  const t = pendientes().length
-  const conectada = !!clientId()
+  const faltan = sinRecordatorio().length
   pinta(`
-    <h2 class="sec">Google</h2>
-    <label class="campo"><span>Id de cliente OAuth</span>
-      <input id="a-cid" value="${esc(clientId())}" placeholder="…apps.googleusercontent.com"
-        autocapitalize="off" autocorrect="off" spellcheck="false"></label>
-    <p class="pista">Se guarda solo en este dispositivo. Cómo obtenerlo, en el README del repo.</p>
+    <h2 class="sec">Carpeta de datos</h2>
+    ${hayCarpeta()
+      ? `<div class="tarjeta"><div class="fila" style="cursor:default"><span class="cuerpo">
+          <span class="tit">Carpeta conectada</span>
+          <span class="meta">${SYNC.ultima
+            ? 'Último guardado: ' + esc(fmtFechaHora(SYNC.ultima)) + (SYNC.sucio ? ' · hay cambios sin volcar' : '')
+            : 'Todavía no se ha guardado nada.'}</span></span></div></div>`
+      : `<p class="pista">Sin carpeta, los datos solo están en este dispositivo.</p>`}
     <div class="botones">
-      <button class="boton principal" id="a-guardar">Guardar id</button>
-      <button class="boton" id="a-conectar">${conectada ? 'Conectar ahora' : 'Conectar'}</button>
+      <button class="boton principal" id="a-carpeta">${hayCarpeta() ? 'Cambiar carpeta' : 'Elegir carpeta'}</button>
+      <button class="boton" id="a-sync">Guardar ahora</button>
     </div>
-    <div class="botones">
-      <button class="boton" id="a-sync">Sincronizar</button>
-      <button class="boton peligro" id="a-salir">Desconectar</button>
-    </div>
-    <p class="pista">${SYNC.ultima
-      ? 'Última sincronización: ' + esc(fmtFechaHora(SYNC.ultima)) + (SYNC.sucio ? ' · hay cambios sin subir' : '')
-      : 'Todavía no se ha sincronizado.'}</p>
+    ${hayCarpeta() ? '<div class="botones"><button class="boton peligro" id="a-olvidar">Olvidar la carpeta</button></div>' : ''}
+    <p class="pista">Elige la carpeta de Google Drive: en el móvil, la que monta el proveedor de
+      archivos del sistema; en Windows, la de Google Drive para escritorio. Quien sincroniza es
+      Drive, no la app. Usa la misma carpeta en los dos sitios.</p>
 
     <h2 class="sec">Recordatorios</h2>
     <div class="dos">
@@ -32,15 +31,20 @@ registra('ajustes', () => {
         ].map(([m, l]) => `<option value="${m}" ${avisoDefecto() === m ? 'selected' : ''}>${esc(l)}</option>`).join('')}
         </select></label>
     </div>
+    <div class="botones">
+      <button class="boton" id="a-ics">Exportar todo a .ics</button>
+      ${faltan ? `<button class="boton" id="a-icsfaltan">Solo los ${faltan} que faltan</button>` : ''}
+    </div>
+    <p class="pista">El .ics se abre con Google Calendar y mete todos los eventos de una vez.
+      Es la forma rápida de poner al día el calendario sin ir tarea por tarea.</p>
+
     <div class="linea">
       <input type="checkbox" id="a-notif" ${avisosOn() ? 'checked' : ''}>
       <span>Avisar de lo vencido al abrir la app</span>
     </div>
-    <p class="pista">La web no puede lanzar un aviso a una hora concreta con la app cerrada.
-      Para eso está el recordatorio de Google Calendar, que sí suena con el móvil guardado.</p>
-    ${sinRecordatorio().length ? `<div class="banda">Hay ${sinRecordatorio().length} tarea(s) marcada(s)
-      para Calendar sin evento creado, de cuando no había conexión o id de cliente.
-      <button class="boton" id="a-recordatorios">Crear los que faltan</button></div>` : ''}
+    <p class="pista">La web no puede lanzar un aviso a una hora concreta con la app cerrada, ni
+      escribir en el calendario del móvil: eso lo hacen las apps nativas con un permiso de Android
+      que a una página no se le da. Por eso el aviso de verdad es el evento de Google Calendar.</p>
 
     <h2 class="sec">Datos</h2>
     <div class="botones">
@@ -48,48 +52,53 @@ registra('ajustes', () => {
       <button class="boton" id="a-importa">Importar JSON</button>
     </div>
     <p class="pista">${vivos('areas').length} áreas · ${vivos('projects').length} proyectos ·
-      ${vivos('modules').length} módulos · ${t} tareas pendientes · ${vivos('people').length} personas</p>
+      ${vivos('modules').length} módulos · ${pendientes().length} tareas pendientes ·
+      ${vivos('people').length} personas</p>
     <div class="botones"><button class="boton" id="a-personas">Personas</button></div>
 
     <h2 class="sec">Acerca de</h2>
     <p class="pista">GlobalManager · versión <span id="version">…</span></p>`)
 
-  $('#a-guardar').onclick = () => {
-    setClientId($('#a-cid').value)
-    localStorage.removeItem('gm_carpeta')
-    status(clientId() ? 'Id guardado. Pulsa Conectar.' : 'Id borrado: la app queda en modo local.')
-    dibuja()
-  }
-  // El diálogo de Google solo se puede abrir desde un toque del usuario; de ahí que
-  // conectar sea un botón y no algo que pase en el arranque.
-  $('#a-conectar').onclick = async () => {
-    try {
-      await accessToken(true)
-      status('Conectado con Google.')
-      await sincroniza(true)
-      dibuja()
-    } catch (e) { status(e.message, true) }
+  $('#a-carpeta').onclick = async () => {
+    if (await eligeCarpeta()) { await revisaDormida(); dibuja() }
   }
   $('#a-sync').onclick = () => sincroniza(true).then(dibuja)
-  $('#a-salir').onclick = () => {
-    desconecta()
+  const olv = $('#a-olvidar')
+  if (olv) olv.onclick = async () => {
+    if (!confirm('¿Olvidar la carpeta? Los datos siguen en ella y en este dispositivo; solo se deja de escribir ahí.')) return
+    await olvidaCarpeta()
+    await revisaDormida()
     pintaSync('off')
-    status('Desconectado. Los datos siguen en este dispositivo.')
+    status('Carpeta olvidada.')
     dibuja()
   }
 
   $('#a-hora').onchange = e => setHoraDefecto(e.target.value)
   $('#a-aviso').onchange = e => setAvisoDefecto(Number(e.target.value))
+
+  $('#a-ics').onclick = () => {
+    const n = descargaIcs(pendientes(), `globalmanager-${hoyISO()}.ics`)
+    if (n) status(`${n} evento(s) en el archivo. Ábrelo con Google Calendar.`)
+  }
+  const icsf = $('#a-icsfaltan')
+  if (icsf) icsf.onclick = () => {
+    const cuales = sinRecordatorio()
+    const n = descargaIcs(cuales, `globalmanager-pendientes-${hoyISO()}.ics`)
+    if (!n) return
+    // Se dan por puestos: la app no puede comprobar si el usuario llegó a importarlos,
+    // pero dejarlos marcados como pendientes para siempre sería peor.
+    for (const t of cuales) marcaRecordatorio(t)
+    trasCambio()
+    status(`${n} evento(s) en el archivo. Ábrelo con Google Calendar.`)
+    dibuja()
+  }
+
   $('#a-notif').onchange = async e => {
-    if (e.target.checked) {
-      const ok = await pidePermisoAvisos()
-      e.target.checked = ok
-    } else localStorage.setItem('gm_avisos', '0')
+    if (e.target.checked) e.target.checked = await pidePermisoAvisos()
+    else localStorage.setItem('gm_avisos', '0')
   }
 
   $('#a-personas').onclick = () => ve('personas')
-  const rec = $('#a-recordatorios')
-  if (rec) rec.onclick = () => creaRecordatoriosPendientes().then(dibuja)
 
   $('#a-exporta').onclick = () => {
     const a = document.createElement('a')
@@ -113,7 +122,7 @@ registra('ajustes', () => {
         SYNC.sucio = true
         guardaLocal()
         status('Importado y fusionado.')
-        trasCambio(null)
+        trasCambio()
         dibuja()
       } catch (e) { status('No se pudo importar: ' + e.message, true) }
     }

@@ -1,8 +1,9 @@
 # GlobalManager
 
 App instalable en el móvil para llevar tareas, mantenimientos, regalos y compras.
-Sin backend y sin build: es HTML, CSS y JavaScript servidos tal cual. Los datos viven en
-**tu** Google Drive y los recordatorios se crean en **tu** Google Calendar.
+Sin backend y sin build: es HTML, CSS y JavaScript servidos tal cual. Los datos viven en una
+carpeta de **tu** Google Drive y los recordatorios se crean en **tu** Google Calendar, sin
+claves de API ni proyecto de Google Cloud.
 
 Tres niveles de organización — **área → proyecto → módulo** — y las tareas pueden colgar
 de cualquiera de ellos: un área puede tener tareas directamente, sin proyectos ni módulos.
@@ -11,8 +12,8 @@ de cualquiera de ellos: un área puede tener tareas directamente, sin proyectos 
 
 ## Puesta en marcha
 
-Son dos cosas: publicar la app y darle acceso a tu cuenta de Google. La primera es un
-minuto; la segunda, unos diez, y solo se hace una vez.
+No hay que crear ningún proyecto en Google Cloud, ni pedir claves, ni dar permisos de API.
+La app usa las apps de Google que ya tienes instaladas.
 
 ### 1. Publicar la app en GitHub Pages
 
@@ -22,90 +23,82 @@ Hace falta **https**: sin él, Chrome no deja instalar la app ni registrar el se
 2. *Source*: **Deploy from a branch**. *Branch*: `main`, carpeta `/ (root)`. **Save**.
 3. A los dos minutos la app está en `https://<tu-usuario>.github.io/vgh_globalmanager/`.
 
-### 2. Crear el cliente OAuth de Google
-
-Sin esto la app funciona igual, pero solo en el dispositivo donde la abras: ni comparte
-datos con el PC ni crea recordatorios.
-
-1. Entra en <https://console.cloud.google.com/> y crea un proyecto (por ejemplo
-   `globalmanager`).
-2. **APIs y servicios → Biblioteca**. Activa las dos:
-   - **Google Drive API**
-   - **Google Calendar API**
-3. **APIs y servicios → Pantalla de consentimiento de OAuth**:
-   - Tipo de usuario: **Externo**.
-   - Rellena nombre de la app y correo de contacto.
-   - En **Usuarios de prueba**, añade tu propia cuenta de Google. Esto es lo que te
-     permite usarla sin pasar por la verificación de Google.
-   - Deja la app en estado **Prueba / Testing**. `calendar.events` es un permiso
-     sensible: publicarla en producción exigiría que Google la verificase, y para uso
-     personal no hace ninguna falta.
-4. **APIs y servicios → Credenciales → Crear credenciales → ID de cliente de OAuth**:
-   - Tipo: **Aplicación web**.
-   - **Orígenes autorizados de JavaScript** (uno por línea; sin barra al final):
-     - `https://<tu-usuario>.github.io`
-     - `http://localhost:8099` — solo si vas a probar en el PC
-   - No hace falta URI de redirección: el flujo de Google Identity Services no la usa.
-5. Copia el **ID de cliente** (termina en `.apps.googleusercontent.com`).
-
-### 3. Meter el id en la app
-
-Abre la app → **Ajustes** → pega el id en *Id de cliente OAuth* → **Guardar id** →
-**Conectar**. Google pedirá permiso una vez. A partir de ahí:
-
-- se crea una carpeta `GlobalManager` en tu Drive con un `global.json` dentro;
-- los recordatorios aparecen en tu calendario principal.
-
-Repite este paso en cada dispositivo (móvil y PC) con **el mismo id**: es lo que hace que
-los dos vean la misma carpeta.
-
-### 4. Instalarla en el móvil
+### 2. Instalarla en el móvil
 
 Chrome en Android → menú **⋮** → **Instalar aplicación** / *Añadir a pantalla de inicio*.
 
+### 3. Elegir la carpeta
+
+**Ajustes → Elegir carpeta.** Elige una carpeta dentro de tu Google Drive:
+
+- **Android**: la carpeta de Drive que monta el proveedor de archivos del sistema.
+- **Windows**: la misma carpeta dentro de la unidad de Google Drive para escritorio.
+
+La app crea ahí un `global.json` y guarda las fotos al lado. **Quien sincroniza es Google
+Drive, no la app**: ella solo lee y escribe archivos en una carpeta. Es el mismo mecanismo
+que ya usa Bitácora.
+
+Elige la **misma carpeta** en el móvil y en el PC y los dos verán lo mismo.
+
+> De vez en cuando el navegador vuelve a pedir permiso sobre la carpeta —normal después de
+> cerrarlo y abrirlo—. La pantalla de inicio enseña un botón para reconectarla; no se
+> pierde nada.
+
 ---
 
-## Permisos que pide, y por qué
+## Recordatorios: cómo funcionan aquí
 
-| Permiso | Para qué | Qué **no** puede hacer |
-|---|---|---|
-| `drive.file` | Crear y leer la carpeta `GlobalManager` y sus archivos | Ver ningún otro archivo de tu Drive |
-| `calendar.events` | Crear, mover y borrar los eventos de tus tareas | Leer eventos que no haya creado la app |
+Una app nativa como la del gimnasio escribe en tu calendario porque Android le da un
+permiso de sistema (`CalendarContract`). **A una página web no se le da ese permiso**, y no
+hay API de navegador equivalente. Así que la app hace lo que sí puede, que para el uso
+diario cunde igual:
 
-El id de cliente se guarda solo en el `localStorage` del navegador. No está en el
-repositorio y no viaja a ningún sitio: no es un secreto, pero tampoco hace falta
-publicarlo.
+- **Añadir a Google Calendar** en la ficha de la tarea. Abre Google Calendar con el evento
+  ya montado —título, fecha, hora, descripción, datos de referencia y, si toca, la
+  repetición— y tú lo guardas de un toque. En Android lo recoge la app de Calendar; en
+  Windows, la web.
+- **Exportar a `.ics`** desde Ajustes, para meter muchos eventos de golpe en vez de ir uno
+  a uno. También hay un botón para exportar solo los que faltan.
+
+A cambio, hay dos cosas que la app **no puede** hacer, y que por eso avisa en vez de
+callarse:
+
+- Si cambias la fecha de una tarea, el evento del calendario se queda con la vieja. La
+  ficha lo marca como **desfasado**: añades el nuevo y borras el viejo en Calendar.
+- Si borras una tarea, su evento sigue en tu calendario. El diálogo de borrado te lo dice.
+
+Una vez guardado, el aviso lo da Google Calendar: suena con el móvil en el bolsillo y la
+app cerrada, y aparece también en el PC.
 
 ---
 
-## Notificaciones: lo que se puede y lo que no
+## Notificaciones propias: lo que se puede y lo que no
 
-Conviene saberlo antes de esperar algo que no va a pasar.
-
-- **Google Calendar**: es el aviso de verdad. Suena con el móvil en el bolsillo y la app
-  cerrada, y aparece también en el PC. Por eso cada tarea con fecha crea un evento.
-- **Notificación al abrir la app**: agrupa lo vencido y lo de hoy en un solo aviso.
-- **`periodicsync`**: solo en la app instalada, y el navegador la dispara cuando le
-  parece — como mucho cada pocas horas. Es una cortesía, no un despertador.
+- **Aviso al abrir la app**: agrupa lo vencido y lo de hoy en una sola notificación.
+- **`periodicsync`**: solo en la app instalada, y el navegador la dispara cuando le parece
+  — como mucho cada pocas horas. Es una cortesía, no un despertador.
 - **Lo que no existe**: programar una notificación para una hora concreta con la app
-  cerrada. La API que lo permitía nunca llegó a producción, y las notificaciones push
-  de verdad necesitan un servidor, que este proyecto no tiene.
+  cerrada. La API que lo permitía nunca llegó a producción, y el push de verdad necesita un
+  servidor, que este proyecto no tiene. Para eso está el evento de Calendar.
 
 ---
 
 ## Sincronización entre móvil y PC
 
-Todo se guarda primero en el dispositivo (IndexedDB) y después se sube. La app funciona
-entera sin conexión; al volver la red, sube lo pendiente.
+Todo se guarda primero en el dispositivo (IndexedDB) y después en la carpeta. La app
+funciona entera aunque la carpeta no esté disponible; cuando vuelve, vuelca lo pendiente,
+fotos incluidas.
 
-El archivo `global.json` de Drive es el punto de encuentro. Al sincronizar se baja, se
-**fusiona** con lo local registro a registro quedándose con el más reciente, y se vuelve
-a subir comprobando antes que nadie haya escrito entretanto. Los borrados dejan una marca
+El `global.json` de la carpeta es el punto de encuentro. Al sincronizar se lee, se
+**fusiona** con lo local registro a registro quedándose con el más reciente, y se vuelve a
+escribir solo si el resultado difiere de lo que había —reescribir por reescribir haría que
+Drive volviese a subir el archivo en todos los dispositivos—. Los borrados dejan una marca
 `deleted` en vez de desaparecer; si no, al fusionar volverían a aparecer.
 
 Lo que esto no cubre: si editas **la misma tarea** en el móvil y en el PC sin sincronizar
-en medio, gana la última guardada y la otra versión se pierde. Sin servidor no hay forma
-de hacerlo mejor, y para una app personal el caso es raro.
+en medio, gana la última guardada. Y si los dos escriben a la vez, Drive puede dejar una
+copia en conflicto en la carpeta. Sin servidor no hay forma de hacerlo mejor, y para una
+app personal el caso es raro.
 
 ---
 

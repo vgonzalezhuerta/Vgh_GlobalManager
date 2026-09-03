@@ -10,8 +10,8 @@ const vacio = () => ({
 })
 
 let S = vacio()
-// Estado de sincronización: qué versión de Drive tenemos y si hay cambios sin subir.
-let SYNC = { fileId: null, version: null, sucio: false, ultima: null }
+// Estado de sincronización: la fecha del archivo que leímos y si hay cambios sin volcar.
+let SYNC = { mtime: null, sucio: false, ultima: null }
 
 /* ---------- IndexedDB ---------- */
 

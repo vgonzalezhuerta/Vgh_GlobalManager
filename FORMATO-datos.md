@@ -1,7 +1,7 @@
 # Formato de `global.json`
 
-Un solo archivo dentro de la carpeta `GlobalManager` del Drive del usuario. Si se cambia
-el formato, hay que actualizar este documento en el mismo commit.
+Un solo archivo dentro de la carpeta de Google Drive que elige el usuario. Si se cambia el
+formato, hay que actualizar este documento en el mismo commit.
 
 ```jsonc
 {
@@ -79,10 +79,10 @@ Solo se usan en las áreas de tipo `gifts`.
   "doneAt": null,           // solo en las no periódicas ya archivadas
   "lastDoneAt": 1772540000000,
   "priority": 1,            // 0 normal, 1 alta, 2 urgente
-  "calendar": true,         // el usuario quiere recordatorio
-  "calendarEventId": "abc123",
+  "calendarPuesto": 1772540000000,          // cuándo se abrió el enlace de Calendar
+  "calendarSello": "2027-03-03|09:00|6monthdone",
   "fields": [ { "k": "Modelo", "v": "ecoTEC plus VMW 246" } ],
-  "photos": [ { "fileId": "1AbC…", "name": "foto_x.jpg", "w": 1600, "h": 1200 } ],
+  "photos": [ { "name": "foto_x.jpg", "w": 1600, "h": 1200 } ],
   "log": [ { "at": 1772540000000, "note": "Purgado el radiador", "photos": [] } ],
 
   // solo en áreas "gifts"
@@ -109,26 +109,29 @@ Es la distinción que hace útil una tarea de mantenimiento:
 | `unit` | `day`, `week`, `month`, `year` |
 | `from` | `due` (desde la fecha prevista) o `done` (desde que se completa) |
 
-`from: "due"` se traduce a un `RRULE` y Calendar repite el evento solo. `from: "done"` no
-es expresable como `RRULE` —depende de cuándo se haga— así que va como evento único y la
-app lo recrea al completar la tarea.
+`from: "due"` se traduce a un `RRULE` que viaja en el enlace y en el `.ics`, y Calendar
+repite el evento solo. `from: "done"` no es expresable como `RRULE` —depende de cuándo se
+haga— así que va como evento único que se vuelve a proponer al completar la tarea.
+
+### `calendarPuesto` y `calendarSello`
+
+La app no puede modificar un evento que ya está en el calendario, ni saber si el usuario
+llegó a guardarlo. Lo que sí puede es recordar **con qué datos** se abrió el enlace:
+`calendarSello` es `due|time|periodicidad`. Si el sello actual no coincide con el guardado,
+el evento del calendario se quedó viejo y la ficha lo marca como desfasado.
 
 ### `photos`
 
-Cada foto es un archivo aparte en la misma carpeta de Drive.
+Cada foto es un archivo aparte en la misma carpeta, referenciado por su `name`.
 
-```jsonc
-{ "fileId": "1AbC…", "name": "foto_x.jpg" }   // ya subida
-{ "local": "foto_x.jpg", "name": "foto_x.jpg" } // hecha sin conexión, pendiente de subir
-```
-
-Mientras no tiene `fileId`, el blob espera en el almacén `subidas` de IndexedDB.
-`subePendientes()` la sube y cambia `local` por `fileId` en todas las tareas que la citen.
+Al hacer una foto, el blob se guarda en el almacén `subidas` de IndexedDB con el nombre que
+tendrá. Si la carpeta está disponible se vuelca enseguida; si no, espera ahí a la próxima
+sincronización. Leer una foto mira primero `subidas` y después la carpeta.
 
 ## Almacenes de IndexedDB
 
 | Almacén | Contenido |
 |---|---|
-| `meta` | `modelo` (copia local completa), `sync` (id y versión del archivo de Drive), `avisos` (resumen que lee el service worker) |
-| `thumbs` | Miniaturas de 400 px, indexadas por `fileId` o clave local |
-| `subidas` | Fotos hechas sin conexión, a la espera de subir |
+| `meta` | `modelo` (copia local completa), `root` (el handle de la carpeta elegida), `sync` (fecha del archivo leído), `avisos` (resumen que lee el service worker) |
+| `thumbs` | Miniaturas de 400 px, indexadas por el nombre del archivo |
+| `subidas` | Fotos a la espera de escribirse en la carpeta |

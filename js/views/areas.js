@@ -154,7 +154,7 @@ registra('formArea', id => {
     const obj = a || { id: uid(), order: vivos('areas').length }
     Object.assign(obj, { name, icon: $('#f-icono').value, kind: $('#f-kind').value })
     upsert('areas', obj)
-    trasCambio(null)
+    trasCambio()
     atras()
   }
   if (a) $('#f-borrar').onclick = () => borraRama('areas', a, `¿Borrar «${a.name}» con todo lo que contiene?`)
@@ -180,7 +180,7 @@ registra('formProyecto', arg => {
     const obj = p || { id: uid(), areaId, order: proyectosDe(areaId).length }
     Object.assign(obj, { name, notes: $('#f-notas').value.trim() })
     upsert('projects', obj)
-    trasCambio(null)
+    trasCambio()
     atras()
   }
   if (p) $('#f-borrar').onclick = () => borraRama('projects', p, `¿Borrar el proyecto «${p.name}» con sus módulos y tareas?`)
@@ -207,7 +207,7 @@ registra('formModulo', arg => {
     const obj = m || { id: uid(), areaId, projectId, order: modulosDe(projectId).length }
     Object.assign(obj, { name, notes: $('#f-notas').value.trim() })
     upsert('modules', obj)
-    trasCambio(null)
+    trasCambio()
     atras()
   }
   if (m) $('#f-borrar').onclick = () => borraRama('modules', m, `¿Borrar el módulo «${m.name}» y sus tareas?`)
@@ -217,6 +217,8 @@ registra('formModulo', arg => {
 // huérfanas invisibles pero contando en el archivo.
 function borraRama (col, obj, pregunta) {
   if (!confirm(pregunta)) return
+  // Los eventos que el usuario guardó en Google Calendar se quedan ahí: la app no puede
+  // borrarlos, así que al menos hay que decirlo.
   const proys = col === 'areas' ? proyectosDe(obj.id) : col === 'projects' ? [obj] : []
   const mods = col === 'modules' ? [obj] : proys.flatMap(p => modulosDe(p.id))
   const tareas = vivos('tasks').filter(t =>
@@ -224,11 +226,11 @@ function borraRama (col, obj, pregunta) {
     (col === 'projects' && t.projectId === obj.id) ||
     (col === 'modules' && t.moduleId === obj.id))
 
-  for (const t of tareas) { if (t.calendarEventId) borraEvento(t).catch(() => {}); borra('tasks', t.id) }
+  for (const t of tareas) borra('tasks', t.id)
   for (const m of mods) borra('modules', m.id)
   if (col === 'areas') for (const p of proys) borra('projects', p.id)
   borra(col, obj.id)
-  trasCambio(null)
+  trasCambio()
   status('Borrado.')
   // La pantalla de la que veníamos ya no existe: se vuelve a la raíz de áreas.
   PILA = [{ nombre: 'areas', arg: null }]

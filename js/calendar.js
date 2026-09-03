@@ -1,118 +1,140 @@
 'use strict'
 
-// Google Calendar es el despertador de la app: su notificación llega con el móvil en
-// el bolsillo y además aparece en el PC. Las notificaciones web solo pueden avisar con
-// la app abierta o cuando el navegador decide despertarla, así que lo importante va aquí.
-const CAL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+// Ninguna API de navegador puede escribir en el calendario del móvil: eso lo hacen las
+// apps nativas con un permiso de Android que a una página web no se le da. Lo que sí se
+// puede es abrir Google Calendar con el evento ya montado para que el usuario confirme
+// de un toque, y exportar un .ics que Calendar importa entero.
 const zona = () => (Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Madrid')
-
-const horaDefecto = () => localStorage.getItem('gm_hora') || '09:00'
-const setHoraDefecto = h => localStorage.setItem('gm_hora', h || '09:00')
-
 const FREQ = { day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', year: 'YEARLY' }
+const DURACION = 30
 
 // Solo la periodicidad contada desde la fecha prevista se puede escribir como RRULE.
-// «Cada 6 meses desde que se hace» no es expresable: depende de cuándo se haga, así
-// que ese caso va como evento único y se recoloca al completar la tarea.
+// «Cada 6 meses desde que se hace» depende de cuándo se haga, así que va como evento
+// suelto que se vuelve a proponer cada vez que se completa la tarea.
 function rrule (rep) {
   if (!rep || !rep.n || rep.from === 'done') return null
   const f = FREQ[rep.unit]
-  if (!f) return null
-  return [`RRULE:FREQ=${f};INTERVAL=${rep.n}`]
+  return f ? `RRULE:FREQ=${f};INTERVAL=${rep.n}` : null
 }
 
-function evento (t) {
-  const hora = t.time || horaDefecto()
-  const [h, m] = hora.split(':').map(Number)
-  const fin = new Date(`${t.due}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`)
-  fin.setMinutes(fin.getMinutes() + 30)
-  const pad = n => String(n).padStart(2, '0')
-  const finISO = `${fin.getFullYear()}-${pad(fin.getMonth() + 1)}-${pad(fin.getDate())}T${pad(fin.getHours())}:${pad(fin.getMinutes())}:00`
+const pad = n => String(n).padStart(2, '0')
 
-  const cuerpo = [rutaDe(t), t.desc, (t.fields || []).map(f => `${f.k}: ${f.v}`).join('\n')]
+function momentos (t) {
+  const [h, m] = (t.time || horaDefecto()).split(':').map(Number)
+  const [a, me, d] = t.due.split('-').map(Number)
+  const ini = new Date(a, me - 1, d, h, m, 0)
+  const fin = new Date(ini.getTime() + DURACION * 60000)
+  const sello = f => `${f.getFullYear()}${pad(f.getMonth() + 1)}${pad(f.getDate())}T${pad(f.getHours())}${pad(f.getMinutes())}00`
+  return { ini: sello(ini), fin: sello(fin) }
+}
+
+function cuerpoEvento (t) {
+  return [rutaDe(t), t.desc, (t.fields || []).map(f => `${f.k}: ${f.v}`).join('\n')]
     .filter(Boolean).join('\n\n')
+}
 
-  const ev = {
-    summary: t.title,
-    description: cuerpo,
-    start: { dateTime: `${t.due}T${pad(h)}:${pad(m)}:00`, timeZone: zona() },
-    end: { dateTime: finISO, timeZone: zona() },
-    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: avisoDefecto() }] },
-    extendedProperties: { private: { gmTaskId: t.id } }
-  }
+// Enlace de plantilla de Google Calendar. En Android lo recoge la app de Calendar y
+// abre la pantalla de evento nuevo ya rellena.
+function enlaceEvento (t) {
+  const { ini, fin } = momentos(t)
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: t.title,
+    dates: `${ini}/${fin}`,
+    details: cuerpoEvento(t),
+    ctz: zona()
+  })
   const r = rrule(t.repeat)
-  if (r) ev.recurrence = r
-  return ev
+  if (r) p.set('recur', r)
+  return 'https://calendar.google.com/calendar/render?' + p.toString()
 }
 
-// Crea o actualiza el evento de una tarea. Sin fecha no hay evento, y si la tarea la
-// pierde se borra el que hubiera.
-async function sincronizaEvento (t, interactivo = false) {
-  if (!clientId()) throw new Error('Falta el id de cliente OAuth. Ponlo en Ajustes.')
-  if (!t.due || !t.calendar) {
-    if (t.calendarEventId) await borraEvento(t, interactivo)
-    return null
-  }
-  const cuerpo = JSON.stringify(evento(t))
-  const opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: cuerpo }
+/* ---------- .ics ---------- */
 
-  if (t.calendarEventId) {
-    try {
-      const r = await gjson(`${CAL}/${encodeURIComponent(t.calendarEventId)}`,
-        Object.assign({}, opts, { method: 'PATCH' }), interactivo)
-      return r.id
-    } catch (e) {
-      // 404/410: el usuario lo borró desde Calendar. Se crea uno nuevo en vez de fallar.
-      if (!/40[49]|410/.test(e.message)) throw e
-      t.calendarEventId = null
+const escIcs = s => String(s == null ? '' : s)
+  .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
+
+// El formato obliga a partir las líneas de más de 75 octetos, con un espacio al empezar
+// la continuación. Sin esto, una descripción larga rompe el archivo.
+function pliega (linea) {
+  const b = new TextEncoder().encode(linea)
+  if (b.length <= 75) return linea
+  const trozos = []
+  let i = 0
+  while (i < linea.length) {
+    let corte = i
+    let bytes = 0
+    const tope = trozos.length ? 74 : 75
+    while (corte < linea.length && bytes + new TextEncoder().encode(linea[corte]).length <= tope) {
+      bytes += new TextEncoder().encode(linea[corte]).length
+      corte++
     }
+    trozos.push((trozos.length ? ' ' : '') + linea.slice(i, corte))
+    i = corte
   }
-  const r = await gjson(CAL, opts, interactivo)
-  t.calendarEventId = r.id
+  return trozos.join('\r\n')
+}
+
+// Las horas van «flotantes», sin zona ni Z: significan la hora local de quien lo importa,
+// que es justo lo que se quiere en un recordatorio personal, y evita tener que meter un
+// bloque VTIMEZONE entero en el archivo.
+function ics (tareas) {
+  const ahoraUTC = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  const l = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GlobalManager//ES', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH']
+  for (const t of tareas) {
+    if (!t.due) continue
+    const { ini, fin } = momentos(t)
+    l.push('BEGIN:VEVENT')
+    l.push(`UID:gm-${t.id}@globalmanager`)
+    l.push(`DTSTAMP:${ahoraUTC}`)
+    l.push(`DTSTART:${ini}`)
+    l.push(`DTEND:${fin}`)
+    l.push(`SUMMARY:${escIcs(t.title)}`)
+    const c = cuerpoEvento(t)
+    if (c) l.push(`DESCRIPTION:${escIcs(c)}`)
+    const r = rrule(t.repeat)
+    if (r) l.push(r)
+    l.push('BEGIN:VALARM', `TRIGGER:-PT${avisoDefecto()}M`, 'ACTION:DISPLAY',
+      `DESCRIPTION:${escIcs(t.title)}`, 'END:VALARM')
+    l.push('END:VEVENT')
+  }
+  l.push('END:VCALENDAR')
+  return l.map(pliega).join('\r\n') + '\r\n'
+}
+
+function descargaIcs (tareas, nombre) {
+  const conFecha = tareas.filter(t => t.due)
+  if (!conFecha.length) { status('No hay ninguna tarea con fecha que exportar.', true); return 0 }
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([ics(conFecha)], { type: 'text/calendar;charset=utf-8' }))
+  a.download = nombre
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+  return conFecha.length
+}
+
+/* ---------- qué recordatorio se ha puesto ya ---------- */
+
+// La app no puede saber si el usuario llegó a guardar el evento, ni modificarlo después.
+// Lo que sí puede es recordar con qué fecha y periodicidad se abrió el enlace: si eso
+// cambia, hay que avisar de que el evento del calendario se quedó viejo.
+const selloEvento = t => `${t.due || ''}|${t.time || horaDefecto()}|${t.repeat ? `${t.repeat.n}${t.repeat.unit}${t.repeat.from}` : ''}`
+
+const recordatorioPuesto = t => !!t.calendarPuesto && t.calendarSello === selloEvento(t)
+const recordatorioViejo = t => !!t.calendarPuesto && t.calendarSello !== selloEvento(t)
+
+function marcaRecordatorio (t) {
+  t.calendarPuesto = ahora()
+  t.calendarSello = selloEvento(t)
   upsert('tasks', t)
-  return r.id
 }
 
-async function borraEvento (t, interactivo = false) {
-  if (!t.calendarEventId) return
-  try {
-    await gfetch(`${CAL}/${encodeURIComponent(t.calendarEventId)}`, { method: 'DELETE' }, interactivo)
-  } catch (e) {
-    // Si ya no está, el objetivo se cumple igual.
-    if (!/40[49]|410/.test(e.message)) throw e
-  }
-  t.calendarEventId = null
-  upsert('tasks', t)
+function abreCalendario (t) {
+  if (!t.due) { status('La tarea necesita una fecha para crear el recordatorio.', true); return }
+  window.open(enlaceEvento(t), '_blank', 'noopener')
+  marcaRecordatorio(t)
+  trasCambio(null)
 }
 
-// Se llama tras guardar una tarea. No bloquea la interfaz ni tumba el guardado si
-// Calendar falla: la tarea ya está a salvo en el dispositivo.
-function sincronizaEventoSuave (t) {
-  if (!t.calendar && !t.calendarEventId) return
-  // Sin id de cliente no hay nada que hacer y no es un error: la app funciona en local
-  // y la pantalla de inicio ya avisa de que falta configurarlo.
-  if (!clientId()) return
-  sincronizaEvento(t, false)
-    .then(id => { if (id) status('Recordatorio en Google Calendar actualizado.') })
-    .catch(e => status('Tarea guardada, pero el recordatorio no: ' + e.message, true))
-}
-
-// Tareas marcadas para Calendar que nunca llegaron a tener evento: creadas sin conexión,
-// o antes de configurar el id de cliente. Sin esto se quedarían sin recordatorio para
-// siempre y en silencio.
-const sinRecordatorio = () => pendientes().filter(t => t.calendar && t.due && !t.calendarEventId)
-
-async function creaRecordatoriosPendientes () {
-  const faltan = sinRecordatorio()
-  if (!faltan.length) { status('No falta ningún recordatorio.'); return 0 }
-  let hechos = 0
-  for (const t of faltan) {
-    try { await sincronizaEvento(t, false); hechos++ } catch (e) {
-      status(`Se han creado ${hechos} de ${faltan.length}: ` + e.message, true)
-      return hechos
-    }
-  }
-  status(hechos === 1 ? 'Creado 1 recordatorio.' : `Creados ${hechos} recordatorios.`)
-  if (clientId()) sincroniza(false)
-  return hechos
-}
+// Con fecha y sin recordatorio puesto, o con uno que se quedó viejo.
+const sinRecordatorio = () => pendientes().filter(t => t.due && !recordatorioPuesto(t))

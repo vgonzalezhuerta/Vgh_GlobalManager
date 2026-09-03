@@ -107,19 +107,19 @@ async function arranca () {
     }
   }
 
-  if (!clientId()) {
-    // Sin id de cliente no hay Drive ni Calendar, pero la app sirve igual en local.
-    pintaSync('off')
-  } else {
-    await sincroniza(false)
-  }
+  // Reconectar en silencio: si el navegador quiere confirmación, la banda de inicio
+  // ofrece el botón, porque pedir el permiso exige un gesto del usuario.
+  await revisaDormida()
+  if (await reconectaCarpeta(false)) await sincroniza(false)
+  else pintaSync(dormida ? 'error' : 'off')
+  dibuja()
 
   await avisaPendientes()
   await guardaResumenParaSW()
 
-  window.addEventListener('online', () => { if (SYNC.sucio) sincroniza(false) })
+  // Al volver a la app puede haber escrito el otro dispositivo: se relee la carpeta.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && clientId()) sincroniza(false)
+    if (document.visibilityState === 'visible' && hayCarpeta()) sincroniza(false)
   })
 }
 

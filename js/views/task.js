@@ -51,6 +51,26 @@ registra('tarea', id => {
     </li>`).join('') + '</ul>'
   }
 
+  if (t.due && t.status !== 'done') {
+    html += '<h2 class="sec">Recordatorio</h2>'
+    if (recordatorioViejo(t)) {
+      html += `<div class="banda">La fecha o la periodicidad han cambiado desde que creaste el
+        recordatorio. Añade el nuevo y borra el viejo en Google Calendar: la app no puede
+        tocar un evento que ya está en tu calendario.
+        <button class="boton" id="t-cal">Añadir el nuevo</button></div>`
+    } else if (recordatorioPuesto(t)) {
+      html += `<div class="tarjeta"><div class="fila" style="cursor:default"><span class="cuerpo">
+        <span class="tit">Añadido a Google Calendar</span>
+        <span class="meta">${esc(fmtFechaHora(t.calendarPuesto))}</span></span></div></div>
+        <div class="botones"><button class="boton" id="t-cal">Volver a añadir</button>
+        <button class="boton" id="t-ics">Descargar .ics</button></div>`
+    } else {
+      html += `<div class="botones"><button class="boton principal" id="t-cal">Añadir a Google Calendar</button>
+        <button class="boton" id="t-ics">.ics</button></div>
+        <p class="pista">Se abre Google Calendar con el evento ya montado; solo tienes que guardarlo.</p>`
+    }
+  }
+
   html += `<div class="botones">
     ${t.status === 'done'
       ? '<button class="boton" id="t-reabrir">Reabrir</button>'
@@ -75,14 +95,26 @@ registra('tarea', id => {
     })
   })
 
-  if (t.status === 'done') app.querySelector('#t-reabrir').onclick = () => { reabre(t); trasCambio(t); dibuja() }
+  const cal = app.querySelector('#t-cal')
+  if (cal) cal.onclick = () => { abreCalendario(t); dibuja() }
+  const cics = app.querySelector('#t-ics')
+  if (cics) cics.onclick = () => {
+    descargaIcs([t], `${t.title.replace(/[^\wáéíóúñÁÉÍÓÚÑ ]+/g, '').slice(0, 40) || 'tarea'}.ics`)
+    marcaRecordatorio(t)
+    trasCambio()
+    dibuja()
+  }
+
+  if (t.status === 'done') app.querySelector('#t-reabrir').onclick = () => { reabre(t); trasCambio(); dibuja() }
   else app.querySelector('#t-hecha').onclick = () => ve('completar', t.id)
 
   app.querySelector('#t-borrar').onclick = () => {
-    if (!confirm(`¿Borrar «${t.title}»?`)) return
-    if (t.calendarEventId) borraEvento(t).catch(() => {})
+    const aviso = recordatorioPuesto(t) || recordatorioViejo(t)
+      ? `¿Borrar «${t.title}»? El evento que creaste en Google Calendar hay que borrarlo allí.`
+      : `¿Borrar «${t.title}»?`
+    if (!confirm(aviso)) return
     borra('tasks', t.id)
-    trasCambio(null)
+    trasCambio()
     status('Tarea borrada.')
     atras()
   }
@@ -127,7 +159,7 @@ registra('completar', id => {
 
   $('#c-ok').onclick = () => {
     completa(t, $('#c-nota').value.trim(), fotos)
-    trasCambio(t)
+    trasCambio()
     status(t.repeat ? `Hecha. Próxima: ${fmtFecha(t.due)}.` : 'Hecha.')
     atras()
   }
@@ -218,11 +250,6 @@ function formularioTarea (opts) {
       <p class="pista">«Desde que se hace» es lo que quieres en mantenimiento: cada 6 meses
         contados desde la última vez, no desde la fecha que tocaba.</p>
 
-      <div class="linea">
-        <input type="checkbox" id="f-cal" ${t ? (t.calendar ? 'checked' : '') : 'checked'}>
-        <span>Crear recordatorio en Google Calendar</span>
-      </div>
-
       <label class="campo"><span>Prioridad</span>
         <select id="f-pri">
           <option value="0" ${!t || t.priority === 0 ? 'selected' : ''}>Normal</option>
@@ -297,7 +324,7 @@ function formularioTarea (opts) {
     const repeat = n > 0 ? { n, unit: $('#f-rep-u').value, from: $('#f-rep-f').value } : null
     if (repeat && !due) { status('Una tarea periódica necesita una primera fecha.', true); return }
 
-    const obj = t || { id: uid(), status: 'open', log: [], calendarEventId: null }
+    const obj = t || { id: uid(), status: 'open', log: [], calendarPuesto: null, calendarSello: null }
     Object.assign(obj, {
       areaId,
       projectId: projectId || null,
@@ -307,7 +334,6 @@ function formularioTarea (opts) {
       due,
       time: $('#f-time').value || null,
       repeat,
-      calendar: $('#f-cal').checked && !!due,
       priority: Number($('#f-pri').value) || 0,
       fields: campos.filter(c => c.k.trim() || c.v.trim()),
       photos: fotos
@@ -324,8 +350,9 @@ function formularioTarea (opts) {
     })
 
     upsert('tasks', obj)
-    trasCambio(obj)
-    status('Guardada.')
+    trasCambio()
+    status(obj.due && !recordatorioPuesto(obj)
+      ? 'Guardada. Añade el recordatorio desde la ficha.' : 'Guardada.')
     atras()
   }
 

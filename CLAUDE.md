@@ -1,8 +1,8 @@
 # GlobalManager — contexto del proyecto
 
 App instalable (PWA) para llevar tareas, mantenimientos, regalos y compras. Sin backend y
-sin build. Los datos van al Google Drive del usuario y los recordatorios a su Google
-Calendar.
+sin build. Los datos van a una carpeta de Google Drive que elige el usuario, y los
+recordatorios a su Google Calendar. **Sin claves de API ni proyecto de Google Cloud.**
 
 ## Restricciones que NO se pueden romper
 
@@ -13,23 +13,27 @@ ninguna:
    escritorio es el segundo escenario, no el primero.
 2. **Sin bundler, sin npm, sin frameworks.** Varios archivos servidos tal cual desde
    GitHub Pages. Se edita, se sube y funciona.
-3. **Tiene que funcionar sin conexión.** El modelo entero vive en IndexedDB y Drive es
-   solo el punto de encuentro entre dispositivos. Ninguna pantalla puede exigir red.
-4. **Las credenciales no van al repositorio.** El id de cliente OAuth se pega en Ajustes
-   y se queda en `localStorage`. `.gitignore` bloquea `global.json` y los `*.jpg`.
-5. **Los permisos de Google son los mínimos**: `drive.file` (solo lo que crea la app) y
-   `calendar.events`. No ampliarlos sin una razón que no tenga alternativa.
+3. **Tiene que funcionar sin conexión.** El modelo entero vive en IndexedDB y la carpeta
+   es solo el punto de encuentro entre dispositivos. Ninguna pantalla puede exigir red.
+4. **Nada de OAuth, claves de API ni proyecto de Google Cloud.** Fue una etapa anterior y
+   se quitó a propósito: obligaba al usuario a montar una consola de Google para una app
+   personal. Si algo parece necesitarlo, es que hay otro camino.
+5. **La carpeta se lee con la File System Access API** (`showDirectoryPicker`). No
+   sustituir por subida de archivos ni por almacenamiento del navegador: el usuario quiere
+   sus archivos en su carpeta de Drive. `.gitignore` bloquea `global.json` y los `*.jpg`.
 6. **Español en toda la interfaz**, incluidos los mensajes de error.
 
 ## Cómo están los datos
 
-Una carpeta `GlobalManager` en el Drive del usuario:
+La carpeta que elige el usuario dentro de su Google Drive:
 
 ```
-GlobalManager/
+<carpeta elegida>/
 ├─ global.json      todo el modelo: áreas, proyectos, módulos, personas y tareas
-└─ foto_*.jpg       una foto por archivo, referenciada por su fileId
+└─ foto_*.jpg       una foto por archivo, referenciada por su nombre
 ```
+
+Quien sincroniza entre dispositivos es Google Drive. La app solo lee y escribe archivos.
 
 El esquema completo está en `FORMATO-datos.md`; si se cambia el formato, actualizar ese
 documento en el mismo commit.
@@ -50,13 +54,13 @@ antes que las vistas**, porque cada vista se registra al cargarse llamando a `re
   `status()`.
 - **`store.js`** — el modelo `S`, IndexedDB, `upsert()`/`borra()` (borrado por marca),
   las consultas, `completa()` y `fusiona()`.
-- **`google.js`** — Google Identity Services. Entrega un token de una hora y **no da token
-  de refresco**: se renueva en silencio con `prompt: ''` mientras el permiso siga
-  concedido. Abrir el diálogo exige un gesto del usuario, y por eso conectar es un botón
-  de Ajustes y no algo que pase en el arranque.
-- **`drive.js`** — carpeta, `global.json`, subida de fotos pendientes y `sincroniza()`.
-- **`calendar.js`** — crea, mueve y borra los eventos; `rrule()` y los recordatorios que
-  quedaron pendientes.
+- **`carpeta.js`** — `showDirectoryPicker()`, el handle recordado en IndexedDB,
+  `sincroniza()` y el volcado de fotos pendientes. `pickerBusy` impide dos selectores a la
+  vez (Chrome falla). Volver a pedir el permiso abre un diálogo y **eso exige un gesto del
+  usuario**: por eso al arrancar solo se consulta (`reconectaCarpeta(false)`) y reconectar
+  es un botón.
+- **`calendar.js`** — enlace de plantilla de Google Calendar, generación de `.ics` y el
+  sello que detecta un recordatorio desfasado.
 - **`photos.js`** — reducción a 1600 px, miniaturas de 400 px en IndexedDB, carga perezosa
   con `IntersectionObserver` y visor.
 - **`notify.js`** — permisos, aviso agrupado al abrir y registro de `periodicsync`.
@@ -66,11 +70,15 @@ antes que las vistas**, porque cada vista se registra al cargarse llamando a `re
 
 ### Sincronización
 
-Se guarda primero en local y se sube después; `SYNC.sucio` marca que hay algo pendiente.
-`sincroniza()` baja el archivo, **fusiona registro a registro quedándose con el
-`updatedAt` mayor**, y antes de subir vuelve a comprobar la versión del archivo por si
-otro dispositivo escribió entretanto. Es lo máximo que se puede hacer sin servidor: si se
-edita la misma tarea en dos sitios sin sincronizar en medio, gana la última.
+Se guarda primero en local; `SYNC.sucio` marca que hay algo pendiente y `SYNC.mtime`
+recuerda la fecha del archivo que leímos. `sincroniza()` lee `global.json`, y si cambió
+desde la última vez es que escribió el otro dispositivo: **fusiona registro a registro
+quedándose con el `updatedAt` mayor** antes de escribir. Solo escribe si el resultado
+difiere de lo que había, porque reescribir por reescribir hace que Drive vuelva a subir el
+archivo en todos los dispositivos.
+
+Es lo máximo que se puede hacer sin servidor: si se edita la misma tarea en dos sitios sin
+sincronizar en medio, gana la última.
 
 ### El botón atrás
 
@@ -79,12 +87,27 @@ lleva una pila propia (`PILA`) y se mantiene **una** entrada de historial mientr
 estemos en la raíz: esa entrada es la que recoge el toque. Toda pantalla nueva se registra
 con `registra()` y se abre con `ve()`, nunca escribiendo en `PILA` a mano.
 
+### Recordatorios
+
+**Ninguna API de navegador puede escribir en el calendario del móvil.** Las apps nativas lo
+hacen con `CalendarContract` y un permiso de Android que a una página no se le da. Lo que
+hay:
+
+- `enlaceEvento(t)` abre Google Calendar con el evento montado y el usuario lo guarda.
+- `ics(tareas)` genera un archivo importable, con horas **flotantes** (sin zona ni `Z`)
+  para no tener que meter un bloque `VTIMEZONE` entero.
+- `selloEvento(t)` guarda con qué fecha, hora y periodicidad se abrió el enlace. Si eso
+  cambia, `recordatorioViejo(t)` lo detecta y la ficha avisa: la app no puede modificar ni
+  borrar un evento que ya está en el calendario, así que lo dice en vez de callarse.
+
+No prometer en la interfaz que la app toca el calendario del usuario. No lo hace.
+
 ### Periodicidad
 
 `repeat.from` distingue dos cosas que no son la misma:
 
-- `due` — cada N unidades desde la fecha prevista. Se traduce a `RRULE` y Calendar la
-  repite solo. Si la tarea está muy atrasada, `completa()` avanza la fecha hasta pasar de
+- `due` — cada N unidades desde la fecha prevista. Se traduce a `RRULE`, va en el enlace
+  y en el `.ics`, y Calendar la repite solo. Si la tarea está muy atrasada, `completa()` avanza la fecha hasta pasar de
   hoy en vez de dejarla otra vez en el pasado.
 - `done` — cada N unidades desde que se marca. Es la de mantenimiento. **No es expresable
   como `RRULE`**, así que va como evento único que se recrea al completar.
