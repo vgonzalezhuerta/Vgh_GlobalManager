@@ -86,6 +86,11 @@ h2.sec {
 }
 h2.sec:first-child { margin-top: 4px; }
 
+/* Captura rápida: es lo primero que se ve y tiene que caber de un pulgar. */
+.rapida { display: flex; gap: 8px; margin-bottom: 4px; }
+.rapida input { flex: 1; }
+.rapida button { width: auto; flex: 0 0 52px; font-size: 1.3rem; padding: 0; }
+
 /* ---------- tarjetas ---------- */
 
 .tarjeta {

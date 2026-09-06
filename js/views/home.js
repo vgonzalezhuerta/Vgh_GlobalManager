@@ -5,6 +5,9 @@
 let dormida = false
 const revisaDormida = async () => { dormida = await carpetaDormida() }
 
+// Lo pone a true el acceso directo «Añadir tarea» del icono de Android.
+let enfocaRapida = false
+
 registra('hoy', () => {
   cabecera('Hoy', fechaLarga())
   const tarde = pendientes().filter(t => t.due && diasHasta(t.due) < 0).sort(ordenTareas)
@@ -12,8 +15,22 @@ registra('hoy', () => {
   const prox = proximas(14)
   const suelto = sinFecha().slice(0, 12)
 
+  const bandeja = entrada()
+
   let html = banda()
-  if (!tarde.length && !hoy.length && !prox.length && !suelto.length) {
+  html += `<div class="rapida">
+    <input id="h-rapida" placeholder="Apuntar algo…" autocomplete="off" enterkeyhint="done">
+    <button class="boton principal" id="h-add" aria-label="Añadir">+</button>
+  </div>`
+
+  if (bandeja.length) {
+    html += `<h2 class="sec">Entrada · ${bandeja.length} sin clasificar</h2>` +
+      listaTareas(bandeja.slice(0, 5))
+    if (bandeja.length > 5) html += `<p class="pista">y ${bandeja.length - 5} más.</p>`
+    html += `<div class="botones"><button class="boton" data-ir="entrada">Clasificar la entrada</button></div>`
+  }
+
+  if (!tarde.length && !hoy.length && !prox.length && !suelto.length && !bandeja.length) {
     html += `<div class="vacio"><strong>Nada pendiente</strong>
       Crea un área y empieza a apuntar tareas.</div>`
   } else {
@@ -27,6 +44,23 @@ registra('hoy', () => {
     }
   }
   pinta(html)
+
+  const inp = $('#h-rapida')
+  const anade = () => {
+    const t = inp.value.trim()
+    if (!t) { inp.focus(); return }
+    anadeRapida(t)
+    trasCambio()
+    inp.value = ''
+    status('Apuntado en la Entrada.')
+    dibuja()
+    // Volver a enfocar permite soltar varias seguidas sin tocar nada más.
+    const nuevo = $('#h-rapida')
+    if (nuevo) nuevo.focus()
+  }
+  $('#h-add').onclick = anade
+  inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); anade() } }
+
   ponFab(() => ve('nuevaTarea', {}))
   cableaBanda()
 })

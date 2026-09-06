@@ -80,6 +80,42 @@ Elige la **misma carpeta** en el móvil y en el PC y los dos verán lo mismo.
 
 ---
 
+## Apuntar deprisa y clasificar después
+
+En la pantalla **Hoy**, arriba del todo, hay una caja: escribes y pulsas Enter. La tarea cae
+en la **Entrada**, sin área ni fecha ni nada más. El foco se queda ahí, así que puedes
+soltar varias seguidas sin tocar nada.
+
+Cuando tengas un rato, **Entrada → 📥** en cualquier tarea abre la lista de destinos —áreas,
+proyectos y módulos, con la sangría dibujando el árbol— y de un toque queda colocada. Con el
+botón **☑** de la cabecera entras en modo selección: marcas varias, *Todas* si quieres, y las
+mueves todas juntas.
+
+Mover no cambia nada más: ni la fecha, ni la periodicidad, ni el historial, ni el
+recordatorio que ya hubieras creado.
+
+También puedes editar cualquier tarea y elegir *📥 Entrada · sin clasificar* como área, para
+devolverla a la bandeja.
+
+---
+
+## Accesos directos y compartir (lo más parecido a un widget)
+
+**Los widgets de pantalla de inicio de Android no son posibles en una PWA.** Un widget es un
+`AppWidgetProvider` dentro de un APK: código nativo que el sistema ejecuta y dibuja. No hay
+API de navegador para registrar uno. Lo que sí hay, y cubre casi lo mismo:
+
+**Accesos directos.** Mantén pulsado el icono de GlobalManager en la pantalla de inicio y
+sale un menú con *Apuntar tarea*, *Entrada*, *Hoy* y *Buscar*. Cada uno se puede arrastrar
+fuera y queda como un icono suelto en la pantalla. *Apuntar tarea* abre la app con el cursor
+ya en la caja de captura.
+
+**Compartir hacia la app.** Desde Chrome, una tienda, WhatsApp o donde sea: *Compartir →
+GlobalManager*, y lo compartido entra como tarea en la Entrada con su enlace guardado. Para
+apuntar un regalo con su página es más rápido que cualquier widget.
+
+---
+
 ## Recordatorios: cómo funcionan aquí
 
 Una app nativa como la del gimnasio escribe en tu calendario porque Android le da un

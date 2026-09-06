@@ -12,12 +12,21 @@ const cuentaArea = id => pendientes().filter(t => t.areaId === id).length
 registra('areas', () => {
   cabecera('Áreas')
   const as = vivos('areas').sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name, 'es'))
+  const bandeja = entrada()
   let html = ''
+  // La Entrada va fija arriba y solo cuando tiene algo: si no, sería una fila muerta.
+  if (bandeja.length) {
+    html += `<div class="tarjeta"><button class="fila" data-ir="entrada">
+      <span class="emoji">📥</span>
+      <span class="cuerpo"><span class="tit">Entrada</span>
+      <span class="meta">Apuntadas deprisa, sin sitio todavía</span></span>
+      <span class="cuenta">${bandeja.length}</span></button></div>`
+  }
   if (!as.length) {
-    html = `<div class="vacio"><strong>Aún no hay áreas</strong>
+    html += `<div class="vacio"><strong>Aún no hay áreas</strong>
       Un área es el cajón grande: Casa, Coche, Regalos, Trabajo…</div>`
   } else {
-    html = '<div class="tarjeta">' + as.map(a => {
+    html += '<div class="tarjeta">' + as.map(a => {
       const n = cuentaArea(a.id)
       return `<button class="fila" data-ir="area" data-arg="${esc(a.id)}">
         <span class="emoji">${esc(a.icon || '📁')}</span>

@@ -176,6 +176,10 @@ function ordenTareas (a, b) {
 
 const pendientes = () => vivos('tasks').filter(t => t.status !== 'done')
 
+// Sin área = sin clasificar. Apuntar primero y decidir después es la única forma de que
+// capturar una tarea no cueste más que la propia tarea.
+const entrada = () => pendientes().filter(t => !t.areaId).sort(ordenTareas)
+
 // Vencidas y de hoy, que es lo que se avisa.
 function paraAvisar () {
   return pendientes().filter(t => t.due && diasHasta(t.due) <= 0).sort(ordenTareas)
@@ -188,9 +192,10 @@ function proximas (dias = 14) {
   }).sort(ordenTareas)
 }
 
-const sinFecha = () => pendientes().filter(t => !t.due).sort(ordenTareas)
+const sinFecha = () => pendientes().filter(t => !t.due && t.areaId).sort(ordenTareas)
 
 function rutaDe (t) {
+  if (!t.areaId) return 'Entrada'
   const a = busca('areas', t.areaId)
   const p = t.projectId && busca('projects', t.projectId)
   const m = t.moduleId && busca('modules', t.moduleId)
@@ -231,6 +236,67 @@ function reabre (t) {
   t.doneAt = null
   upsert('tasks', t)
 }
+
+/* ---------- captura rápida y reasignación ---------- */
+
+// Lo mínimo para no perder la idea: un título. Todo lo demás se rellena al clasificarla.
+function anadeRapida (titulo, extra = {}) {
+  const t = Object.assign({
+    id: uid(),
+    areaId: extra.areaId || null,
+    projectId: extra.projectId || null,
+    moduleId: extra.moduleId || null,
+    title: titulo.trim(),
+    desc: extra.desc || '',
+    due: extra.due || null,
+    time: null,
+    repeat: null,
+    status: 'open',
+    priority: 0,
+    fields: [],
+    photos: [],
+    log: [],
+    calendarPuesto: null,
+    calendarSello: null
+  }, extra.url ? { url: extra.url } : {})
+  upsert('tasks', t)
+  return t
+}
+
+// Mover no toca nada más de la tarea: ni fechas, ni historial, ni el recordatorio, que
+// sigue siendo válido porque el evento no depende de dónde esté colgada.
+function reasigna (ids, destino) {
+  let n = 0
+  for (const id of ids) {
+    const t = busca('tasks', id)
+    if (!t) continue
+    t.areaId = destino.areaId || null
+    t.projectId = destino.projectId || null
+    t.moduleId = destino.moduleId || null
+    upsert('tasks', t)
+    n++
+  }
+  return n
+}
+
+// Todos los sitios donde puede colgar una tarea, aplanados para poder elegir de un toque.
+function destinos () {
+  const out = [{ etiqueta: 'Entrada · sin clasificar', nivel: 0, icono: '📥', destino: {} }]
+  for (const a of vivos('areas').sort((x, y) => (x.order || 0) - (y.order || 0))) {
+    out.push({ etiqueta: a.name, nivel: 0, icono: a.icon || '📁', destino: { areaId: a.id } })
+    for (const p of proyectosDe(a.id)) {
+      out.push({ etiqueta: p.name, nivel: 1, icono: '🗂️', destino: { areaId: a.id, projectId: p.id } })
+      for (const m of modulosDe(p.id)) {
+        out.push({ etiqueta: m.name, nivel: 2, icono: '🔧', destino: { areaId: a.id, projectId: p.id, moduleId: m.id } })
+      }
+    }
+  }
+  return out
+}
+
+const mismoSitio = (t, d) => (t.areaId || null) === (d.areaId || null) &&
+  (t.projectId || null) === (d.projectId || null) &&
+  (t.moduleId || null) === (d.moduleId || null)
 
 /* ---------- semillas ---------- */
 

@@ -81,7 +81,12 @@ async function diagnostico () {
 
 function vigilaActualizaciones (reg) {
   regSW = reg
-  if (reg.waiting && navigator.serviceWorker.controller) hayNueva = true
+  // Si al arrancar ya había un service worker mandando, un cambio de controlador
+  // significa actualización. Si no lo había, es la primera instalación tomando el mando
+  // y recargar ahí hacía que la primera visita se recargase sola, perdiendo por el camino
+  // lo que trajera el acceso directo o el compartir.
+  const habiaControlador = !!navigator.serviceWorker.controller
+  if (reg.waiting && habiaControlador) hayNueva = true
   reg.addEventListener('updatefound', () => {
     const nuevo = reg.installing
     if (!nuevo) return
@@ -95,7 +100,7 @@ function vigilaActualizaciones (reg) {
     })
   })
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (recargando) return
+    if (recargando || !habiaControlador) return
     recargando = true
     location.reload()
   })

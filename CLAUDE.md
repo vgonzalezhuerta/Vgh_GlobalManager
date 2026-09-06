@@ -68,7 +68,35 @@ antes que las vistas**, porque cada vista se registra al cargarse llamando a `re
   diagnóstico de por qué Chrome no la ofrece, y el ciclo de actualización.
 - **`app.js`** — pila de navegación, botón atrás, arranque y errores globales.
 - **`views/`** — `comun.js` (fila de tarea compartida), `home.js`, `areas.js`, `task.js`,
-  `listas.js` (regalos, compras y personas), `buscar.js`, `ajustes.js`.
+  `listas.js` (regalos, compras y personas), `entrada.js` (bandeja y pantalla de mover),
+  `buscar.js`, `ajustes.js`.
+
+### La Entrada
+
+Una tarea con `areaId: null` está **sin clasificar**. No es un caso degradado: es lo que
+permite apuntar algo en dos segundos desde la caja de Hoy y decidir después dónde va.
+`entrada()` las devuelve y `sinFecha()` las excluye a propósito, porque si no saldrían dos
+veces en la misma pantalla. `destinos()` aplana área/proyecto/módulo para poder elegir de un
+toque, y `reasigna()` **solo toca dónde cuelga la tarea**: ni fecha, ni historial, ni
+recordatorio.
+
+### Accesos directos y compartir
+
+Los widgets de Android no son posibles en una PWA —son código nativo dentro de un APK— así
+que lo que hay son los `shortcuts` del manifiesto (`?ir=…`) y `share_target`. Los dos entran
+por `atiendeURL()`, que actúa y **limpia la URL** con `replaceState` para que recargar no
+repita la acción. Al añadir una pantalla nueva que deba tener acceso directo, basta con
+registrarla: `atiendeURL()` acepta cualquier nombre que esté en `PANTALLAS`.
+
+Dos trampas que costaron encontrar y que conviene no reintroducir:
+
+- `dibuja()` **conserva el valor y el foco** del campo que lo tuviera. Sin eso, un repintado
+  disparado por algo asíncrono —el `beforeinstallprompt` de Chrome llega uno o dos segundos
+  después de cargar— se tragaba lo que el usuario estuviera escribiendo en la caja de apuntar
+  o en el buscador.
+- El manejador de `controllerchange` **solo recarga si ya había un controlador** al arrancar.
+  Sin esa condición, la primera visita se recargaba sola en cuanto el service worker tomaba
+  el mando, perdiendo por el camino lo que trajera el acceso directo o el compartir.
 
 ### Sincronización
 

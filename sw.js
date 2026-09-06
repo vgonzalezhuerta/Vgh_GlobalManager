@@ -4,7 +4,7 @@
 // cacheada y el cambio no llega al móvil. Es el error más fácil de cometer aquí, y el
 // único sitio donde se escribe la versión: la insignia de Ajustes se la pregunta al
 // service worker con postMessage('version').
-const VERSION = 'globalmanager-v4'
+const VERSION = 'globalmanager-v5'
 
 const SHELL = [
   './',
@@ -25,6 +25,7 @@ const SHELL = [
   'js/views/areas.js',
   'js/views/task.js',
   'js/views/listas.js',
+  'js/views/entrada.js',
   'js/views/buscar.js',
   'js/views/ajustes.js',
   'icons/icon-192.png',

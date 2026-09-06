@@ -75,7 +75,8 @@ registra('tarea', id => {
     ${t.status === 'done'
       ? '<button class="boton" id="t-reabrir">Reabrir</button>'
       : '<button class="boton principal" id="t-hecha">Marcar como hecha</button>'}
-    <button class="boton peligro" id="t-borrar">Borrar</button></div>`
+    <button class="boton" id="t-mover">Mover</button></div>
+    <div class="botones"><button class="boton peligro" id="t-borrar">Borrar</button></div>`
 
   const app = pinta(html)
   $('[data-editar]').onclick = () => ve('formTarea', { id })
@@ -94,6 +95,8 @@ registra('tarea', id => {
       el.onclick = () => abreLightbox(l.photos, Number(el.dataset.i))
     })
   })
+
+  app.querySelector('#t-mover').onclick = () => ve('mover', { ids: [t.id] })
 
   const cal = app.querySelector('#t-cal')
   if (cal) cal.onclick = () => { abreCalendario(t); dibuja() }
@@ -176,14 +179,14 @@ function formularioTarea (opts) {
   if (opts.id && !t) { atras(); return }
 
   const ctx = opts.ctx || {}
-  let areaId = t ? t.areaId : (ctx.areaId || (vivos('areas')[0] || {}).id)
+  // Sin área es un destino válido, no un error: la tarea se queda en la Entrada.
+  let areaId = t ? (t.areaId || '') : (ctx.areaId || '')
   let projectId = t ? (t.projectId || '') : (ctx.projectId || '')
   let moduleId = t ? (t.moduleId || '') : (ctx.moduleId || '')
   let fotos = t ? (t.photos || []).slice() : []
   let campos = t ? (t.fields || []).slice() : []
   const rep = t && t.repeat ? Object.assign({}, t.repeat) : null
 
-  if (!areaId) { status('Crea un área antes de añadir tareas.', true); ve('formArea', null); return }
   cabecera(t ? 'Editar tarea' : 'Nueva tarea')
 
   const app = $('#app')
@@ -199,8 +202,11 @@ function formularioTarea (opts) {
         <input id="f-tit" value="${esc(t ? t.title : '')}" placeholder="Cambiar filtro de la caldera"></label>
 
       <label class="campo"><span>Área</span>
-        <select id="f-area">${vivos('areas').map(a =>
-          `<option value="${esc(a.id)}" ${a.id === areaId ? 'selected' : ''}>${esc(a.icon || '')} ${esc(a.name)}</option>`).join('')}</select></label>
+        <select id="f-area">
+          <option value="" ${!areaId ? 'selected' : ''}>📥 Entrada · sin clasificar</option>
+          ${vivos('areas').map(a =>
+            `<option value="${esc(a.id)}" ${a.id === areaId ? 'selected' : ''}>${esc(a.icon || '')} ${esc(a.name)}</option>`).join('')}
+        </select></label>
 
       ${proys.length ? `<label class="campo"><span>Proyecto (opcional)</span>
         <select id="f-proy"><option value="">— directamente en el área —</option>
@@ -326,7 +332,7 @@ function formularioTarea (opts) {
 
     const obj = t || { id: uid(), status: 'open', log: [], calendarPuesto: null, calendarSello: null }
     Object.assign(obj, {
-      areaId,
+      areaId: areaId || null,
       projectId: projectId || null,
       moduleId: moduleId || null,
       title,
