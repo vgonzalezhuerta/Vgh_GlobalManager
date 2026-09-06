@@ -56,8 +56,22 @@ registra('ajustes', () => {
       ${vivos('people').length} personas</p>
     <div class="botones"><button class="boton" id="a-personas">Personas</button></div>
 
-    <h2 class="sec">Acerca de</h2>
-    <p class="pista">GlobalManager · versión <span id="version">…</span></p>`)
+    <h2 class="sec">Aplicación</h2>
+    ${estaInstalada()
+      ? '<p class="pista">Está funcionando como app instalada.</p>'
+      : promptInstalar
+        ? `<div class="botones"><button class="boton principal" id="a-instalar">Instalar en este dispositivo</button></div>`
+        : `<p class="pista">Chrome todavía no ofrece instalar esta página. Abajo está el porqué.</p>`}
+    <div class="botones">
+      <button class="boton" id="a-buscar">Buscar actualizaciones</button>
+      ${hayNueva ? '<button class="boton principal" id="a-aplicar">Actualizar ahora</button>' : ''}
+    </div>
+    <p class="pista">Versión instalada: <span id="version">…</span>${
+      ultimaBusqueda() ? ' · comprobado el ' + esc(fmtFechaHora(ultimaBusqueda())) : ''}${
+      hayNueva ? ' · hay una versión nueva descargada, esperando a que la apliques' : ''}</p>
+
+    <h2 class="sec">Diagnóstico de instalación</h2>
+    <div id="a-diag"><p class="pista">Comprobando…</p></div>`)
 
   $('#a-carpeta').onclick = async () => {
     if (await eligeCarpeta()) { await revisaDormida(); dibuja() }
@@ -128,6 +142,27 @@ registra('ajustes', () => {
     }
     inp.click()
   }
+
+  const inst = $('#a-instalar')
+  if (inst) inst.onclick = instala
+  $('#a-buscar').onclick = buscaActualizacion
+  const apl = $('#a-aplicar')
+  if (apl) apl.onclick = aplicaActualizacion
+
+  // El diagnóstico lee el manifiesto y el registro del service worker, así que llega
+  // después de pintar.
+  diagnostico().then(lineas => {
+    const cont = $('#a-diag')
+    if (!cont) return
+    cont.innerHTML = '<div class="tarjeta">' + lineas.map(([que, ok, detalle]) =>
+      `<div class="fila" style="cursor:default">
+        <span class="emoji">${ok ? '✅' : '⚠️'}</span>
+        <span class="cuerpo"><span class="tit">${esc(que)}</span>
+        <span class="meta">${esc(detalle)}</span></span></div>`).join('') + '</div>'
+  }).catch(e => {
+    const cont = $('#a-diag')
+    if (cont) cont.innerHTML = `<p class="pista">No se pudo completar el diagnóstico: ${esc(e.message)}</p>`
+  })
 
   pintaVersion()
 })

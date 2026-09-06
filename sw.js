@@ -4,7 +4,7 @@
 // cacheada y el cambio no llega al móvil. Es el error más fácil de cometer aquí, y el
 // único sitio donde se escribe la versión: la insignia de Ajustes se la pregunta al
 // service worker con postMessage('version').
-const VERSION = 'globalmanager-v2'
+const VERSION = 'globalmanager-v3'
 
 const SHELL = [
   './',
@@ -18,6 +18,7 @@ const SHELL = [
   'js/calendar.js',
   'js/photos.js',
   'js/notify.js',
+  'js/instalar.js',
   'js/app.js',
   'js/views/comun.js',
   'js/views/home.js',
@@ -36,7 +37,9 @@ self.addEventListener('install', e => {
     // Uno a uno: si un archivo falta, addAll tira toda la instalación al suelo y la app
     // se queda sin service worker.
     await Promise.all(SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {})))
-    self.skipWaiting()
+    // Ojo: aquí NO se llama a skipWaiting. Si la versión nueva entrase sola, la página
+    // seguiría corriendo el JavaScript viejo con los archivos ya cambiados debajo. Espera
+    // a que el usuario pulse «Actualizar ahora», que manda el mensaje de abajo.
   })())
 })
 
@@ -77,6 +80,7 @@ self.addEventListener('fetch', e => {
 
 self.addEventListener('message', e => {
   if (e.data === 'version' && e.ports && e.ports[0]) e.ports[0].postMessage(VERSION)
+  if (e.data === 'actualiza') self.skipWaiting()
 })
 
 /* ---------- avisos ---------- */

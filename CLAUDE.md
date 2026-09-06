@@ -64,6 +64,8 @@ antes que las vistas**, porque cada vista se registra al cargarse llamando a `re
 - **`photos.js`** — reducción a 1600 px, miniaturas de 400 px en IndexedDB, carga perezosa
   con `IntersectionObserver` y visor.
 - **`notify.js`** — permisos, aviso agrupado al abrir y registro de `periodicsync`.
+- **`instalar.js`** — captura de `beforeinstallprompt`, botón propio de instalación,
+  diagnóstico de por qué Chrome no la ofrece, y el ciclo de actualización.
 - **`app.js`** — pila de navegación, botón atrás, arranque y errores globales.
 - **`views/`** — `comun.js` (fila de tarea compartida), `home.js`, `areas.js`, `task.js`,
   `listas.js` (regalos, compras y personas), `buscar.js`, `ajustes.js`.
@@ -86,6 +88,15 @@ En Android, sin entradas de historial, atrás cerraba la app desde cualquier pan
 lleva una pila propia (`PILA`) y se mantiene **una** entrada de historial mientras no
 estemos en la raíz: esa entrada es la que recoge el toque. Toda pantalla nueva se registra
 con `registra()` y se abre con `ve()`, nunca escribiendo en `PILA` a mano.
+
+### Instalación
+
+Chrome esconde «Instalar aplicación» en sitios distintos según la versión y, si falla algún
+requisito, no lo dice: la opción simplemente no sale. Por eso `instalar.js` captura
+`beforeinstallprompt` (con `preventDefault()`, sin él Chrome enseña su propio aviso y luego
+ya no se puede lanzar a mano) y ofrece un botón propio, más un diagnóstico de los cinco
+requisitos. En incógnito Chrome nunca instala: si algo no cuadra al depurar, mirar eso
+primero.
 
 ### Recordatorios
 
@@ -133,6 +144,11 @@ No prometer en la interfaz avisos que el navegador no puede dar.
    sigue sirviendo la versión cacheada y el cambio no llega. Es el error más fácil de
    cometer aquí. Ese número es el único que se escribe: la insignia de Ajustes se lo
    pregunta al service worker con `postMessage('version')`.
+
+   El service worker **no llama a `skipWaiting()` al instalarse**: la versión nueva espera
+   a que el usuario pulse «Actualizar ahora», que le manda el mensaje `'actualiza'`. Si
+   entrase sola, la página seguiría corriendo el JavaScript viejo con los archivos ya
+   cambiados debajo.
 2. Si añades o quitas un archivo, mételo también en `SHELL` de `sw.js`.
 3. Comprueba que el JS sigue siendo válido (`node --check`) y que no se han roto los datos
    existentes.

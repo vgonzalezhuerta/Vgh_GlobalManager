@@ -25,7 +25,30 @@ Hace falta **https**: sin él, Chrome no deja instalar la app ni registrar el se
 
 ### 2. Instalarla en el móvil
 
-Chrome en Android → menú **⋮** → **Instalar aplicación** / *Añadir a pantalla de inicio*.
+**Ajustes → Aplicación → Instalar en este dispositivo.** La app trae su propio botón porque
+Chrome cambia de sitio esa opción según la versión, y cuando no cumple algún requisito no
+lo dice: simplemente no aparece.
+
+Si el botón no está, justo debajo hay un **diagnóstico** que marca cuál de los cinco
+requisitos falla. Los motivos habituales:
+
+| Lo que ves | Qué pasa |
+|---|---|
+| *Origen seguro* en rojo | Estás en `http://` o en `file://`. Solo se instala desde `https://`, y GitHub Pages ya lo da |
+| *Service worker activo* en rojo | La página no cargó del todo, o Pages devolvió un 404 |
+| *Chrome ofrece instalar* en rojo con todo lo demás en verde | Suele bastar con volver a entrar en la página. **En pestaña de incógnito Chrome nunca instala**, y si ya la tenías instalada tampoco lo ofrece |
+
+También puedes seguir usando el menú **⋮** de Chrome → *Instalar aplicación* / *Añadir a
+pantalla de inicio*.
+
+### 2b. Buscar actualizaciones
+
+**Ajustes → Aplicación → Buscar actualizaciones.** Si hay una versión nueva se descarga y
+queda esperando; el botón **Actualizar ahora** la aplica y recarga. La app también mira una
+vez al día al abrirse, y avisa en la pantalla de inicio cuando encuentra algo.
+
+La versión nueva **no entra sola** a propósito: si lo hiciera, la página seguiría corriendo
+el JavaScript viejo con los archivos ya cambiados debajo.
 
 ### 3. Elegir la carpeta
 

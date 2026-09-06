@@ -156,9 +156,12 @@ textarea { min-height: 96px; resize: vertical; }
 .boton.principal { background: var(--acento); color: var(--acento-txt); border-color: transparent; }
 .boton.peligro { color: var(--alerta); }
 .boton:active { transform: translateY(1px); }
-.botones { display: flex; gap: 10px; margin-top: 18px; }
+.botones { display: flex; gap: 10px; margin: 18px 0 4px; }
 
+/* El margen negativo pega la pista al campo de arriba; detrás de botones o de una
+   casilla sobra, y si se deja los tapa. */
 .pista { font-size: .76rem; color: var(--tinta2); margin: -8px 2px 14px; }
+.botones + .pista, .linea + .pista, .tarjeta + .pista, .fotos + .pista { margin-top: 6px; }
 
 /* ---------- fotos ---------- */
 

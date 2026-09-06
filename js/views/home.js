@@ -51,6 +51,15 @@ function banda () {
           Drive para compartirlos con el PC.
           <button class="boton" data-banda="ajustes">Elegir carpeta</button></div>`
   }
+  if (hayNueva) {
+    return `<div class="banda">Hay una versión nueva descargada.
+      <button class="boton" data-banda="actualizar">Actualizar ahora</button></div>`
+  }
+  if (promptInstalar && !estaInstalada()) {
+    return `<div class="banda">Puedes instalar GlobalManager como app y abrirla desde la pantalla
+      de inicio, sin la barra del navegador.
+      <button class="boton" data-banda="instalar">Instalar</button></div>`
+  }
   if (!('Notification' in window)) return ''
   if (Notification.permission === 'default' && localStorage.getItem('gm_avisos') !== '0') {
     return `<div class="banda">¿Quieres que la app te avise de lo vencido al abrirla?
@@ -65,6 +74,8 @@ function cableaBanda () {
   b.onclick = async () => {
     const q = b.dataset.banda
     if (q === 'ajustes') ve('ajustes')
+    else if (q === 'instalar') await instala()
+    else if (q === 'actualizar') aplicaActualizacion()
     else if (q === 'reconectar') {
       const ok = await reconectaCarpeta(true)
       await revisaDormida()

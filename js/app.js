@@ -100,8 +100,11 @@ async function arranca () {
   if ('serviceWorker' in navigator) {
     try {
       const reg = await navigator.serviceWorker.register('sw.js')
-      reg.addEventListener('updatefound', () => status('Hay una versión nueva; ciérrala y ábrela otra vez.'))
+      vigilaActualizaciones(reg)
       pintaVersion()
+      // Una comprobación al abrir, como mucho una vez al día, para no pedir el sw.js
+      // en cada arranque.
+      if (navigator.onLine && ahora() - ultimaBusqueda() > 86400000) reg.update().catch(() => {})
     } catch (e) {
       status('No se pudo instalar el service worker: ' + e.message, true)
     }
