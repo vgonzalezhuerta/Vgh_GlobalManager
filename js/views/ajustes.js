@@ -74,7 +74,10 @@ registra('ajustes', () => {
       descarga otra vez. Tus datos no se tocan.</p>
 
     <h2 class="sec">Diagnóstico de instalación</h2>
-    <div id="a-diag"><p class="pista">Comprobando…</p></div>`)
+    <div id="a-diag"><p class="pista">Comprobando…</p></div>
+    <p class="pista">Android guarda los accesos directos del icono <strong>al instalar</strong> la app,
+      no al actualizarla. Si se añadieron después, hay que desinstalarla y volver a instalarla para
+      que aparezcan. Tus datos no se pierden: están en la carpeta y en el navegador.</p>`)
 
   $('#a-carpeta').onclick = async () => {
     if (await eligeCarpeta()) { await revisaDormida(); dibuja() }

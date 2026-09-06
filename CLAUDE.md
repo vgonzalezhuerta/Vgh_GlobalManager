@@ -83,7 +83,10 @@ recordatorio.
 ### Accesos directos y compartir
 
 Los widgets de Android no son posibles en una PWA —son código nativo dentro de un APK— así
-que lo que hay son los `shortcuts` del manifiesto (`?ir=…`) y `share_target`. Los dos entran
+que lo que hay son los `shortcuts` del manifiesto (`?ir=…`) y `share_target`. **Android graba
+los accesos directos en el WebAPK al instalar, no al actualizar**: tocar el manifiesto no los
+cambia en una app ya instalada hasta que Chrome regenera el paquete, que tarda. Si alguien
+dice que no le salen, lo primero es que reinstale, no buscar el fallo en el manifiesto. Los dos entran
 por `atiendeURL()`, que actúa y **limpia la URL** con `replaceState` para que recargar no
 repita la acción. Al añadir una pantalla nueva que deba tener acceso directo, basta con
 registrarla: `atiendeURL()` acepta cualquier nombre que esté en `PANTALLAS`.
@@ -186,7 +189,9 @@ No prometer en la interfaz avisos que el navegador no puede dar.
    No quitar ninguna de las dos cosas por ganar velocidad de arranque.
 2. Si añades o quitas un archivo, mételo también en `SHELL` de `sw.js`.
 3. Comprueba que el JS sigue siendo válido (`node --check`) y que no se han roto los datos
-   existentes.
+   existentes. **Prueba también sirviendo desde un subdirectorio** (`/Vgh_GlobalManager/`),
+   que es como vive en GitHub Pages: todas las rutas del proyecto son relativas y en la raíz
+   del servidor un fallo de ruta no se ve.
 4. No dejes `console.log` de depuración; los errores se enseñan con `status(msg, true)`.
 
 ## Estilo del código

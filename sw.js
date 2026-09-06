@@ -4,7 +4,7 @@
 // cacheada y el cambio no llega al móvil. Es el error más fácil de cometer aquí, y el
 // único sitio donde se escribe la versión: la insignia de Ajustes se la pregunta al
 // service worker con postMessage('version').
-const VERSION = 'globalmanager-v5'
+const VERSION = 'globalmanager-v6'
 
 const SHELL = [
   './',

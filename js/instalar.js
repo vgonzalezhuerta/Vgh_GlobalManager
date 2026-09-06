@@ -25,10 +25,17 @@ window.addEventListener('appinstalled', () => {
 const origenSeguro = () => location.protocol === 'https:' ||
   ['localhost', '127.0.0.1'].includes(location.hostname)
 
-const estaInstalada = () =>
-  matchMedia('(display-mode: standalone)').matches ||
-  matchMedia('(display-mode: minimal-ui)').matches ||
-  navigator.standalone === true
+const MODOS = ['standalone', 'minimal-ui', 'fullscreen', 'window-controls-overlay']
+
+// Un acceso directo antiguo de «Añadir a pantalla de inicio» abre una pestaña normal del
+// navegador; una app instalada de verdad, no. Distinguirlos importa: solo la segunda tiene
+// menú de accesos directos.
+function modoVisualizacion () {
+  for (const m of MODOS) if (matchMedia(`(display-mode: ${m})`).matches) return m
+  return navigator.standalone === true ? 'standalone' : 'navegador'
+}
+
+const estaInstalada = () => modoVisualizacion() !== 'navegador'
 
 async function instala () {
   if (!promptInstalar) {
@@ -69,6 +76,19 @@ async function diagnostico () {
 
   const sw = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null
   l.push(['Service worker activo', !!(sw && sw.active), sw ? `ámbito ${sw.scope}` : 'no registrado'])
+
+  const modo = modoVisualizacion()
+  l.push(['Abierta como app instalada', modo !== 'navegador',
+    modo === 'navegador'
+      ? 'ahora mismo es una pestaña del navegador · un acceso directo de «Añadir a pantalla de inicio» no cuenta como app'
+      : 'modo ' + modo])
+
+  // Android graba los accesos directos dentro del WebAPK al instalar, no al actualizar.
+  const atajos = man ? (man.shortcuts || []) : []
+  l.push(['Accesos directos declarados', atajos.length > 0,
+    atajos.length
+      ? atajos.map(a => a.name).join(', ') + ' · si no salen al mantener pulsado el icono, reinstala la app'
+      : 'ninguno en el manifiesto'])
 
   l.push(['Chrome ofrece instalar', !!promptInstalar || estaInstalada(),
     estaInstalada() ? 'ya está instalada'

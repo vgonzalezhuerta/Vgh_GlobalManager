@@ -110,6 +110,16 @@ sale un menú con *Apuntar tarea*, *Entrada*, *Hoy* y *Buscar*. Cada uno se pued
 fuera y queda como un icono suelto en la pantalla. *Apuntar tarea* abre la app con el cursor
 ya en la caja de captura.
 
+> **Si no aparecen:** Android graba los accesos directos dentro del WebAPK —el paquete que
+> Chrome genera— **al instalar la app, no al actualizarla**. Si la instalaste antes de que
+> existieran, el paquete instalado sigue sin ellos. Chrome acaba regenerándolo solo, pero
+> tarda un día o más; **desinstalar y volver a instalar** lo arregla al momento. Los datos no
+> se pierden: están en la carpeta de Drive y en el navegador, no en la app.
+>
+> El diagnóstico de Ajustes tiene dos líneas para comprobarlo: *Abierta como app instalada*
+> (si dice «pestaña del navegador», lo que tienes es un acceso directo antiguo de tipo
+> marcador, que nunca trae menú) y *Accesos directos declarados*.
+
 **Compartir hacia la app.** Desde Chrome, una tienda, WhatsApp o donde sea: *Compartir →
 GlobalManager*, y lo compartido entra como tarea en la Entrada con su enlace guardado. Para
 apuntar un regalo con su página es más rápido que cualquier widget.
