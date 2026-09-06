@@ -4,7 +4,7 @@
 // cacheada y el cambio no llega al móvil. Es el error más fácil de cometer aquí, y el
 // único sitio donde se escribe la versión: la insignia de Ajustes se la pregunta al
 // service worker con postMessage('version').
-const VERSION = 'globalmanager-v3'
+const VERSION = 'globalmanager-v4'
 
 const SHELL = [
   './',
@@ -57,11 +57,32 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return
   if (url.origin !== self.location.origin) return
 
+  // La página en sí va a la red primero, con la caché de red de seguridad. Servirla desde
+  // la caché era cómodo pero dejaba la app instalada anclada a la versión vieja: hasta que
+  // no se refrescaba por detrás y se volvía a abrir, no llegaba ningún cambio. Y si el
+  // cambio era justo el que arregla las actualizaciones, no llegaba nunca.
+  if (e.request.mode === 'navigate') {
+    e.respondWith((async () => {
+      const cache = await caches.open(VERSION)
+      try {
+        const r = await fetch(e.request)
+        if (r.ok) cache.put(e.request, r.clone())
+        return r
+      } catch (err) {
+        return await cache.match(e.request, { ignoreSearch: true }) ||
+          await cache.match('index.html') ||
+          new Response('Sin conexión y sin copia local de la página.',
+            { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+      }
+    })())
+    return
+  }
+
   e.respondWith((async () => {
     const cache = await caches.open(VERSION)
     const guardado = await cache.match(e.request, { ignoreSearch: true })
     if (guardado) {
-      // Se sirve lo cacheado y se refresca por detrás, así arranca al instante offline.
+      // El resto sí sale de la caché y se refresca por detrás: así arranca al instante.
       fetch(e.request).then(r => { if (r.ok) cache.put(e.request, r.clone()) }).catch(() => {})
       return guardado
     }

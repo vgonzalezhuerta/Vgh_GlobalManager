@@ -102,9 +102,10 @@ async function arranca () {
       const reg = await navigator.serviceWorker.register('sw.js')
       vigilaActualizaciones(reg)
       pintaVersion()
-      // Una comprobación al abrir, como mucho una vez al día, para no pedir el sw.js
-      // en cada arranque.
-      if (navigator.onLine && ahora() - ultimaBusqueda() > 86400000) reg.update().catch(() => {})
+      // Comprobar en cada arranque. reg.update() solo vuelve a pedir el sw.js —unos pocos
+      // KB— y no hace nada más si no ha cambiado; quedarse anclado a una versión vieja
+      // molesta mucho más que ese tráfico.
+      if (navigator.onLine) reg.update().catch(() => {})
     } catch (e) {
       status('No se pudo instalar el service worker: ' + e.message, true)
     }

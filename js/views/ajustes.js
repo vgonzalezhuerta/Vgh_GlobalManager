@@ -69,6 +69,9 @@ registra('ajustes', () => {
     <p class="pista">Versión instalada: <span id="version">…</span>${
       ultimaBusqueda() ? ' · comprobado el ' + esc(fmtFechaHora(ultimaBusqueda())) : ''}${
       hayNueva ? ' · hay una versión nueva descargada, esperando a que la apliques' : ''}</p>
+    <div class="botones"><button class="boton peligro" id="a-reinstalar">Forzar recarga completa</button></div>
+    <p class="pista">Si la app se queda atascada en una versión vieja: borra la copia guardada y la
+      descarga otra vez. Tus datos no se tocan.</p>
 
     <h2 class="sec">Diagnóstico de instalación</h2>
     <div id="a-diag"><p class="pista">Comprobando…</p></div>`)
@@ -148,6 +151,7 @@ registra('ajustes', () => {
   $('#a-buscar').onclick = buscaActualizacion
   const apl = $('#a-aplicar')
   if (apl) apl.onclick = aplicaActualizacion
+  $('#a-reinstalar').onclick = reinstala
 
   // El diagnóstico lee el manifiesto y el registro del service worker, así que llega
   // después de pintar.

@@ -50,6 +50,17 @@ vez al día al abrirse, y avisa en la pantalla de inicio cuando encuentra algo.
 La versión nueva **no entra sola** a propósito: si lo hiciera, la página seguiría corriendo
 el JavaScript viejo con los archivos ya cambiados debajo.
 
+Si la app se queda atascada en una versión vieja, en la misma sección hay **Forzar recarga
+completa**: borra la copia guardada y el service worker y la descarga otra vez. **Tus datos
+no se tocan** — siguen en la carpeta de Drive y en el dispositivo.
+
+> Esto es el talón de Aquiles de cualquier PWA: si una versión sale con el service worker
+> mal configurado, la app instalada puede quedarse anclada a ella sin forma de salir desde
+> dentro. Por eso la página se pide siempre a la red (con la caché solo como red de
+> seguridad para el modo sin conexión) y se comprueba si hay versión nueva en cada arranque.
+> Desde una versión anterior a la v4, la salida es cerrar y abrir dos veces, o borrar los
+> datos del sitio en los ajustes de Chrome.
+
 ### 3. Elegir la carpeta
 
 **Ajustes → Elegir carpeta.** Elige una carpeta dentro de tu Google Drive:

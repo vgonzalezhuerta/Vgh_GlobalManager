@@ -141,3 +141,25 @@ async function aplicaActualizacion () {
 }
 
 const ultimaBusqueda = () => Number(localStorage.getItem('gm_buscada') || 0)
+
+// Salida de emergencia: borra la caché y el service worker y vuelve a cargar desde el
+// servidor. No toca IndexedDB, así que las tareas, la carpeta elegida y las fotos
+// pendientes se quedan donde están. Está aquí porque una versión con el service worker
+// mal puesto puede dejar la app anclada sin forma de salir desde dentro.
+async function reinstala () {
+  if (!confirm('Se borrará la copia guardada de la app y se descargará otra vez.\n\nTus datos NO se tocan: siguen en la carpeta y en este dispositivo.')) return
+  status('Borrando la copia guardada…')
+  try {
+    if ('serviceWorker' in navigator) {
+      for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister()
+    }
+    if ('caches' in window) {
+      for (const k of await caches.keys()) await caches.delete(k)
+    }
+  } catch (e) {
+    status('No se pudo limpiar del todo: ' + e.message, true)
+  }
+  recargando = true
+  // Sin el parámetro, Android puede devolver la misma página desde su caché de red.
+  location.replace(location.pathname + '?nueva=' + Date.now())
+}

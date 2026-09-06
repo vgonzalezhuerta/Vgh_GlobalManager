@@ -149,6 +149,13 @@ No prometer en la interfaz avisos que el navegador no puede dar.
    a que el usuario pulse «Actualizar ahora», que le manda el mensaje `'actualiza'`. Si
    entrase sola, la página seguiría corriendo el JavaScript viejo con los archivos ya
    cambiados debajo.
+
+   La **navegación va a la red primero** y solo cae a la caché si no hay conexión. Servirla
+   desde la caché era más rápido pero dejaba la app instalada anclada a la versión vieja, y
+   si el cambio pendiente era justo el que arregla las actualizaciones, no llegaba nunca.
+   El resto de archivos sí sale de la caché y se refresca por detrás. `reinstala()` en
+   `instalar.js` es la salida de emergencia: borra cachés y registro sin tocar IndexedDB.
+   No quitar ninguna de las dos cosas por ganar velocidad de arranque.
 2. Si añades o quitas un archivo, mételo también en `SHELL` de `sw.js`.
 3. Comprueba que el JS sigue siendo válido (`node --check`) y que no se han roto los datos
    existentes.
